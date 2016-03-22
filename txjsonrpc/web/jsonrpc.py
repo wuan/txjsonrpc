@@ -161,7 +161,8 @@ class JSONRPC(resource.Resource, BaseSubhandler):
 
             if hasattr(function, 'with_request'):
                 args = [request] + args
-            elif d:
+
+            if d:
                 d.addCallback(context.call, function, *args, **kwargs)
             else:
                 d = defer.maybeDeferred(function, *args, **kwargs)

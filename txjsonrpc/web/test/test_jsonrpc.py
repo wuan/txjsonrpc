@@ -6,10 +6,12 @@ Test JSON-RPC support.
 from twisted.internet import reactor, defer
 from twisted.trial import unittest
 from twisted.web import server, static
+from twisted.web.http import Request
 
 from txjsonrpc import jsonrpclib
 from txjsonrpc.jsonrpc import addIntrospection
 from txjsonrpc.web import jsonrpc
+from txjsonrpc.web.jsonrpc import with_request
 
 
 class TestRuntimeError(RuntimeError):
@@ -71,6 +73,10 @@ class Test(jsonrpc.JSONRPC):
     def jsonrpc_dict(self, map, key):
         return map[key]
 
+    @with_request
+    def jsonrpc_with_request(self, request):
+        return request is not None and isinstance(request, Request)
+
     def jsonrpc_none(self):
         return "null"
 
@@ -124,7 +130,8 @@ class JSONRPCTestCase(unittest.TestCase):
             1,
             ["a", 1],
             "null",
-            {"a": ["b", "c", 12, []], "D": "foo"}]
+            {"a": ["b", "c", 12, []], "D": "foo"},
+            True]
 
     def testResults(self):
         input = [
@@ -133,7 +140,8 @@ class JSONRPCTestCase(unittest.TestCase):
             ("dict", ({"a": 1}, "a")),
             ("pair", ("a", 1)),
             ("none", ()),
-            ("complex", ())]
+            ("complex", ()),
+            ("with_request", ())]
 
         dl = []
         for methodAndArgs, output in zip(input, self.getExpectedOutput()):
@@ -177,7 +185,7 @@ class JSONRPCTestIntrospection(JSONRPCTestCase):
                  'deferFault', 'dict', 'fail', 'fault',
                  'none', 'pair', 'system.listMethods',
                  'system.methodHelp',
-                 'system.methodSignature'])
+                 'system.methodSignature', 'with_request'])
 
         d = self.proxy().callRemote("system.listMethods")
         d.addCallback(cbMethods)
