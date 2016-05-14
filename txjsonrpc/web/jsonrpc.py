@@ -11,6 +11,7 @@ API Stability: unstable
 Maintainer: U{Duncan McGreggor<mailto:oubiwann@adytum.us>}
 """
 from __future__ import nested_scopes, print_function
+
 try:
     import urlparse
 except ImportError:
@@ -20,6 +21,10 @@ try:
     import xmlrpclib
 except ImportError:
     import xmlrpc.client as xmlrpclib
+import zlib
+import gzip
+import time
+import cStringIO
 
 from twisted.web import resource, server
 from twisted.internet import defer, reactor
@@ -28,7 +33,6 @@ from twisted.web import http
 
 from txjsonrpc import jsonrpclib
 from txjsonrpc.jsonrpc import BaseProxy, BaseQueryFactory, BaseSubhandler
-
 
 # Useful so people don't need to import xmlrpclib directly.
 Fault = xmlrpclib.Fault
@@ -49,6 +53,7 @@ def requires_auth():
     def inner(method):
         method.requires_auth = True
         return method
+
     return inner
 
 
@@ -59,7 +64,6 @@ class NoSuchFunction(Fault):
 
 
 class Unauthorized(jsonrpclib.Fault):
-
     def __init__(self, message):
         Fault.__init__(self, 4000, message)
 
@@ -120,9 +124,8 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         request.content.seek(0, 0)
         # Unmarshal the JSON-RPC data.
         content = request.content.read()
-        log.msg("Client({}): {}".format(request.client, content))
-        if not content and request.method=='GET' and request.args.has_key('request'):
-            content=request.args['request'][0]
+        if not content and request.method == 'GET' and request.args.has_key('request'):
+            content = request.args['request'][0]
         self.callback = request.args['callback'][0] if request.args.has_key('callback') else None
         self.is_jsonp = True if self.callback else False
         parsed = jsonrpclib.loads(content)
@@ -171,6 +174,7 @@ class JSONRPC(resource.Resource, BaseSubhandler):
 
             def _responseFailed(err, call):
                 call.cancel()
+
             request.notifyFinish().addErrback(_responseFailed, d)
         return server.NOT_DONE_YET
 
@@ -181,19 +185,48 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         if version == jsonrpclib.VERSION_PRE1:
             if not isinstance(result, jsonrpclib.Fault):
                 result = (result,)
-            # Convert the result (python) to JSON-RPC
-        try:
-            s = jsonrpclib.dumps(result, id=id, version=version) if not self.is_jsonp else "%s(%s)" %(self.callback,jsonrpclib.dumps(result, id=id, version=version))
-        except:
-            f = jsonrpclib.Fault(self.FAILURE, "can't serialize output")
-            s = jsonrpclib.dumps(f, id=id, version=version) if not self.is_jsonp else "%s(%s)" %(self.callback,jsonrpclib.dumps(f, id=id, version=version))
+                # Convert the result (python) to JSON-RPC
+
+        s = self._render_text(id, result, version)
+
+        s = self._handle_compression(s, request)
+
         request.setHeader("content-length", str(len(s)))
         request.write(s)
         request.finish()
         return original_result
 
+    def _render_text(self, id, result, version):
+        try:
+            s = jsonrpclib.dumps(result, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
+                self.callback, jsonrpclib.dumps(result, id=id, version=version))
+        except:
+            f = jsonrpclib.Fault(self.FAILURE, "can't serialize output")
+            s = jsonrpclib.dumps(f, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
+                self.callback, jsonrpclib.dumps(f, id=id, version=version))
+        return s
+
     def _map_exception(self, exception):
         return self.except_map.get(exception, self.FAILURE)
+
+    def _handle_compression(self, data, request):
+        accepted_encoding = request.getHeader('Accept-encoding')
+
+        if accepted_encoding == "gzip":
+            original_size = len(data)
+            start_time = time.time()
+
+            out_file = cStringIO.StringIO()
+            with gzip.GzipFile(mode='wb', fileobj=out_file) as in_file:
+                in_file.write(data)
+            data = out_file.getvalue()
+
+            compressed_size = len(data)
+            print("compressed data {} -> {} in {:.1f} ms".format(original_size, compressed_size,
+                                                                 (time.time() - start_time) * 1000))
+            request.setHeader("content-encoding", "gzip")
+
+        return data
 
     def _ebRender(self, failure, id):
         if isinstance(failure.value, jsonrpclib.Fault):
@@ -208,7 +241,6 @@ class JSONRPC(resource.Resource, BaseSubhandler):
 
 
 class QueryProtocol(http.HTTPClient):
-
     def connectionMade(self):
         self.sendCommand('POST', self.factory.path)
         self.sendHeader('User-Agent', 'Twisted/JSONRPClib')
@@ -231,7 +263,6 @@ class QueryProtocol(http.HTTPClient):
 
 
 class QueryFactory(BaseQueryFactory):
-
     deferred = None
     protocol = QueryProtocol
 
@@ -253,7 +284,7 @@ class Proxy(BaseProxy):
     """
 
     def __init__(self, url, user=None, password=None,
-                 version=jsonrpclib.VERSION_PRE1, factoryClass=QueryFactory, ssl_ctx_factory = None):
+                 version=jsonrpclib.VERSION_PRE1, factoryClass=QueryFactory, ssl_ctx_factory=None):
         """
         @type url: C{str}
         @param url: The URL to which to post method calls.  Calls will be made
@@ -317,7 +348,7 @@ class Proxy(BaseProxy):
         # XXX generate unique id and pass it as a parameter
         factoryClass = self._getFactoryClass(kwargs)
         factory = factoryClass(self.path, self.host, method, self.user,
-            self.password, version, *args)
+                               self.password, version, *args)
         if self.secure:
             from twisted.internet import ssl
             if self.ssl_ctx_factory is None:
@@ -327,5 +358,6 @@ class Proxy(BaseProxy):
         else:
             reactor.connectTCP(self.host, self.port or 80, factory)
         return factory.deferred
+
 
 __all__ = ["JSONRPC", "Handler", "Proxy"]
