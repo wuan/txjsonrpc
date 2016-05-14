@@ -8,10 +8,10 @@ from twisted.trial import unittest
 from twisted.web import server, static
 from twisted.web.http import Request
 
-from txjsonrpc import jsonrpclib
-from txjsonrpc.jsonrpc import addIntrospection
-from txjsonrpc.web import jsonrpc
-from txjsonrpc.web.jsonrpc import with_request
+from xjsonrpc import jsonrpclib
+from xjsonrpc.jsonrpc import addIntrospection
+from xjsonrpc.txweb import jsonrpc
+from xjsonrpc.txweb.jsonrpc import with_request
 
 
 class TestRuntimeError(RuntimeError):

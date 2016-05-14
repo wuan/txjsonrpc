@@ -7,7 +7,7 @@ sys.path.insert(0, os.getcwd())
 from twisted.internet import reactor
 from twisted.internet import defer
 
-from txjsonrpc.netstring.jsonrpc import Proxy
+from xjsonrpc.netstring.jsonrpc import Proxy
 
 
 def printValue(value):

@@ -10,7 +10,6 @@ try:
 except ImportError:
     import simplejson as json
 
-
 # From xmlrpclib.
 SERVER_ERROR = xmlrpclib.SERVER_ERROR
 NOT_WELLFORMED_ERROR = xmlrpclib.NOT_WELLFORMED_ERROR
@@ -25,9 +24,9 @@ INTERNAL_ERROR = xmlrpclib.INTERNAL_ERROR
 METHOD_NOT_CALLABLE = -32604
 
 # Version constants.
-VERSION_PRE1 = 0
 VERSION_1 = 1
 VERSION_2 = 2
+VERSION_x = 111
 
 
 class Fault(xmlrpclib.Fault):
@@ -44,6 +43,7 @@ class JSONRPCEncoder(json.JSONEncoder):
     """
     Provide custom serializers for JSON-RPC.
     """
+
     def default(self, obj):
         if isinstance(obj, datetime):
             return obj.strftime("%Y%m%dT%H:%M:%S")
@@ -61,14 +61,14 @@ def dumps(obj, **kwargs):
         id = None
     if isinstance(obj, Exception):
         result = None
-        if version!=VERSION_2:
+        if version != VERSION_2:
             error = {'fault': obj.__class__.__name__,
-                    'faultCode': obj.faultCode,
-                    'faultString': obj.faultString}
+                     'faultCode': obj.faultCode,
+                     'faultString': obj.faultString}
         else:
             error = {'message': obj.faultString,
-                    'code': obj.faultCode,
-                    'data': ''}
+                     'code': obj.faultCode,
+                     'data': ''}
     else:
         result = obj
         error = None
@@ -106,7 +106,6 @@ def loads(string, **kws):
 
 
 class SimpleParser(object):
-
     buffer = ''
 
     def feed(self, data):
@@ -117,7 +116,6 @@ class SimpleParser(object):
 
 
 class SimpleUnmarshaller(object):
-
     def getmethodname(self):
         return self.parser.data.get("method")
 
@@ -176,6 +174,7 @@ class ServerProxy(xmlrpclib.ServerProxy):
     """
     XXX add missing docstring
     """
+
     def __init__(self, uri, transport=Transport(), version=VERSION_PRE1, *args,
                  **kwds):
         xmlrpclib.ServerProxy.__init__(self, uri, transport, *args, **kwds)
@@ -197,7 +196,7 @@ class ServerProxy(xmlrpclib.ServerProxy):
             self.__handler,
             request,
             verbose=self.__verbose
-            )
+        )
         if len(response) == 1:
             response = response[0]
         return response

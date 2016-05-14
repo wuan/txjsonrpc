@@ -1,6 +1,6 @@
 from twisted.trial.unittest import TestCase
 from twisted.internet import defer
-from txjsonrpc.jsonrpclib import (
+from xjsonrpc.jsonrpclib import (
     Fault, VERSION_PRE1, VERSION_1, VERSION_2, dumps, loads)
 
 

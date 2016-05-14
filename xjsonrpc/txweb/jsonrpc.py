@@ -31,8 +31,8 @@ from twisted.internet import defer, reactor
 from twisted.python import log, context
 from twisted.web import http
 
-from txjsonrpc import jsonrpclib
-from txjsonrpc.jsonrpc import BaseProxy, BaseQueryFactory, BaseSubhandler
+from xjsonrpc import jsonrpclib
+from xjsonrpc.jsonrpc import BaseProxy, BaseQueryFactory, BaseSubhandler
 
 # Useful so people don't need to import xmlrpclib directly.
 Fault = xmlrpclib.Fault

@@ -1,7 +1,7 @@
 from setuptools import setup
 
-from txjsonrpc import meta
-from txjsonrpc.util import dist
+from xjsonrpc import meta
+from xjsonrpc.util import dist
 
 
 setup(

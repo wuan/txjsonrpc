@@ -1,4 +1,4 @@
 from __future__ import print_function
-from txjsonrpc import meta
+from xjsonrpc import meta
 
 print(meta.version)

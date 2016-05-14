@@ -1,8 +1,8 @@
 LIB=txjsonrpc
 NAME=txJSON-RPC
 EGG_NAME=txJSON_RPC
-#BZR=lp:txjsonrpc
-BZR='lp:~oubiwann/txjsonrpc/main'
+#BZR=lp:xjsonrpc
+BZR='lp:~oubiwann/xjsonrpc/main'
 SVN=svn+https://twisted-jsonrpc.googlecode.com/svn/trunk
 FLAG='skip_tests'
 MSG=commit-msg

@@ -1,7 +1,7 @@
 from twisted.internet import defer, protocol
 from twisted.python import reflect
 
-from txjsonrpc import jsonrpclib
+from xjsonrpc import jsonrpclib
 
 
 class BaseSubhandler:

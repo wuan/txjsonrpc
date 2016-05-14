@@ -9,7 +9,7 @@ from time import sleep
 examples = [
     ("tcp/client.py", "tcp/server.tac"),
     ("tcp/client_subhandled.py", "tcp/server_subhandled.tac"),
-    ("web/client.py", "web/server.tac"),
+    ("txweb/client.py", "txweb/server.tac"),
     ("web2/client.py", "web2/server.tac"),
     ("webAuth/client.py", "webAuth/server.tac"),
     ("web2Auth/client.py", "web2Auth/server.tac"),
