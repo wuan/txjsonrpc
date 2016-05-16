@@ -182,48 +182,57 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         result = original_result
         if isinstance(result, Handler):
             result = result.result
-        if version == jsonrpclib.VERSION_PRE1:
-            if not isinstance(result, jsonrpclib.Fault):
-                result = (result,)
-                # Convert the result (python) to JSON-RPC
 
-        s = self._render_text(id, result, version)
+        s = self._render_text(id, result, version, original_result)
 
-        s = self._handle_compression(s, request)
+        s = self._handle_compression(s, request, original_result)
 
         request.setHeader("content-length", str(len(s)))
         request.write(s)
         request.finish()
         return original_result
 
-    def _render_text(self, id, result, version):
-        try:
-            s = jsonrpclib.dumps(result, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
-                self.callback, jsonrpclib.dumps(result, id=id, version=version))
-        except:
-            f = jsonrpclib.Fault(self.FAILURE, "can't serialize output")
-            s = jsonrpclib.dumps(f, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
-                self.callback, jsonrpclib.dumps(f, id=id, version=version))
+    def _render_text(self, id, result, version, original_result):
+	if 'result_json' in original_result:
+	    s = original_result['result_json']
+            print("reuse JSON result")
+        else:
+            try:
+                s = jsonrpclib.dumps(result, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
+                    self.callback, jsonrpclib.dumps(result, id=id, version=version))
+            except:
+                f = jsonrpclib.Fault(self.FAILURE, "can't serialize output")
+                s = jsonrpclib.dumps(f, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
+                    self.callback, jsonrpclib.dumps(f, id=id, version=version))
+            original_result['result_json'] = s
         return s
 
     def _map_exception(self, exception):
         return self.except_map.get(exception, self.FAILURE)
 
-    def _handle_compression(self, data, request):
+    def _handle_compression(self, data, request, original_result):
         accepted_encoding = request.getHeader('Accept-encoding')
 
         if accepted_encoding == "gzip":
-            original_size = len(data)
-            start_time = time.time()
+            if 'result_jsongz' in original_result:
+                data = original_result['result_jsongz']
+                print("reuse JSON gzipped result")
+            else:
+                data = original_result['result_json']
 
-            out_file = cStringIO.StringIO()
-            with gzip.GzipFile(mode='wb', fileobj=out_file) as in_file:
-                in_file.write(data)
-            data = out_file.getvalue()
+                original_size = len(data)
+                start_time = time.time()
 
-            compressed_size = len(data)
-            print("compressed data {} -> {} in {:.1f} ms".format(original_size, compressed_size,
+                out_file = cStringIO.StringIO()
+                with gzip.GzipFile(mode='wb', fileobj=out_file) as in_file:
+                    in_file.write(data)
+                data = out_file.getvalue()
+
+                compressed_size = len(data)
+                print("compressed data {} -> {} in {:.1f} ms".format(original_size, compressed_size,
                                                                  (time.time() - start_time) * 1000))
+                original_result['result_jsongz'] = data
+
             request.setHeader("content-encoding", "gzip")
 
         return data
