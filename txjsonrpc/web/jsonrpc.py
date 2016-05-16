@@ -183,19 +183,20 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         if isinstance(result, Handler):
             result = result.result
 
-        s = self._render_text(id, result, version, original_result)
+	if result is not None:
+            s = self._render_text(id, result, version, original_result)
+            s = self._handle_compression(s, request, original_result)
+ 
+            request.setHeader("content-length", str(len(s)))
+            request.write(s)
 
-        s = self._handle_compression(s, request, original_result)
-
-        request.setHeader("content-length", str(len(s)))
-        request.write(s)
         request.finish()
+
         return original_result
 
     def _render_text(self, id, result, version, original_result):
-	if 'result_json' in original_result:
+	if original_result and 'result_json' in original_result:
 	    s = original_result['result_json']
-            print("reuse JSON result")
         else:
             try:
                 s = jsonrpclib.dumps(result, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
@@ -204,7 +205,10 @@ class JSONRPC(resource.Resource, BaseSubhandler):
                 f = jsonrpclib.Fault(self.FAILURE, "can't serialize output")
                 s = jsonrpclib.dumps(f, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
                     self.callback, jsonrpclib.dumps(f, id=id, version=version))
-            original_result['result_json'] = s
+	    if original_result and isinstance(original_result, dict):
+                original_result['result_json'] = s
+	    else:
+		print('original_result:', type(original_result))
         return s
 
     def _map_exception(self, exception):
@@ -214,12 +218,9 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         accepted_encoding = request.getHeader('Accept-encoding')
 
         if accepted_encoding == "gzip":
-            if 'result_jsongz' in original_result:
+            if original_result and 'result_jsongz' in original_result:
                 data = original_result['result_jsongz']
-                print("reuse JSON gzipped result")
             else:
-                data = original_result['result_json']
-
                 original_size = len(data)
                 start_time = time.time()
 
@@ -229,9 +230,10 @@ class JSONRPC(resource.Resource, BaseSubhandler):
                 data = out_file.getvalue()
 
                 compressed_size = len(data)
-                print("compressed data {} -> {} in {:.1f} ms".format(original_size, compressed_size,
+                print("compress data {} -> {} ({} %) in {:.2f} ms".format(original_size, compressed_size, compressed_size * 100 / original_size,
                                                                  (time.time() - start_time) * 1000))
-                original_result['result_jsongz'] = data
+		if original_result and isinstance(original_result, dict):
+                    original_result['result_jsongz'] = data
 
             request.setHeader("content-encoding", "gzip")
 
