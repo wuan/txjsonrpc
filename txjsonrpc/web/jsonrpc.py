@@ -217,7 +217,7 @@ class JSONRPC(resource.Resource, BaseSubhandler):
     def _handle_compression(self, data, request, original_result):
         accepted_encoding = request.getHeader('Accept-encoding')
 
-        if accepted_encoding == "gzip":
+        if accepted_encoding == "gzip" and len(data) > 500:
             if original_result and 'result_jsongz' in original_result:
                 data = original_result['result_jsongz']
             else:
