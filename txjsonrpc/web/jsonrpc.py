@@ -230,8 +230,10 @@ class JSONRPC(resource.Resource, BaseSubhandler):
                 data = out_file.getvalue()
 
                 compressed_size = len(data)
-                print("compress data {} -> {} ({} %) in {:.2f} ms".format(original_size, compressed_size, compressed_size * 100 / original_size,
-                                                                 (time.time() - start_time) * 1000))
+                elapsed_time = time.time() - start_time
+                break_even = (original_size - compressed_size) / elapsed_time / 1024 / 1024
+                print("compress data {} -> {} ({} %) in {:.2f} ms (break even at {:.1f} MB/s)".format(original_size, compressed_size, compressed_size * 100 / original_size,
+                                                                 elapsed_time * 1000, break_even))
 		if original_result and isinstance(original_result, dict):
                     original_result['result_jsongz'] = data
 
