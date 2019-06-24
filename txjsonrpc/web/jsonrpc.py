@@ -21,7 +21,6 @@ try:
     import xmlrpclib
 except ImportError:
     import xmlrpc.client as xmlrpclib
-import zlib
 import gzip
 import time
 import cStringIO
@@ -183,10 +182,10 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         if isinstance(result, Handler):
             result = result.result
 
-	if result is not None:
+        if result is not None:
             s = self._render_text(id, result, version, original_result)
             s = self._handle_compression(s, request, original_result)
- 
+
             request.setHeader("content-length", str(len(s)))
             request.write(s)
 
@@ -195,8 +194,8 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         return original_result
 
     def _render_text(self, id, result, version, original_result):
-	if original_result and 'result_json' in original_result:
-	    s = original_result['result_json']
+        if original_result and 'result_json' in original_result:
+            s = original_result['result_json']
         else:
             try:
                 s = jsonrpclib.dumps(result, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
@@ -205,10 +204,10 @@ class JSONRPC(resource.Resource, BaseSubhandler):
                 f = jsonrpclib.Fault(self.FAILURE, "can't serialize output")
                 s = jsonrpclib.dumps(f, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
                     self.callback, jsonrpclib.dumps(f, id=id, version=version))
-	    if original_result and isinstance(original_result, dict):
+            if original_result and isinstance(original_result, dict):
                 original_result['result_json'] = s
-	    else:
-		print('original_result:', type(original_result))
+            else:
+                print('original_result:', type(original_result))
         return s
 
     def _map_exception(self, exception):
@@ -232,9 +231,12 @@ class JSONRPC(resource.Resource, BaseSubhandler):
                 compressed_size = len(data)
                 elapsed_time = time.time() - start_time
                 break_even = (original_size - compressed_size) / elapsed_time / 1024 / 1024
-                print("compress data {} -> {} ({} %) in {:.2f} ms (break even at {:.1f} MB/s)".format(original_size, compressed_size, compressed_size * 100 / original_size,
-                                                                 elapsed_time * 1000, break_even))
-		if original_result and isinstance(original_result, dict):
+                print("compress data {} -> {} ({} %) in {:.2f} ms (break even at {:.1f} MB/s)".format(original_size,
+                                                                                                      compressed_size,
+                                                                                                      compressed_size * 100 / original_size,
+                                                                                                      elapsed_time * 1000,
+                                                                                                      break_even))
+                if original_result and isinstance(original_result, dict):
                     original_result['result_jsongz'] = data
 
             request.setHeader("content-encoding", "gzip")

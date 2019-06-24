@@ -42,17 +42,17 @@ class BaseSubhandler:
             handler = self.getSubHandler(prefix)
             if handler is None:
                 raise jsonrpclib.NoSuchFunction(jsonrpclib.METHOD_NOT_FOUND,
-                    "no such sub-handler %s" % prefix)
+                                                "no such sub-handler %s" % prefix)
             return handler._getFunction(functionPath)
         if functionPath == '__dir__':
             return self._listFunctions
         f = getattr(self, "jsonrpc_%s" % functionPath, None)
         if not f:
             raise jsonrpclib.NoSuchFunction(jsonrpclib.METHOD_NOT_FOUND,
-                "function %s not found" % functionPath)
+                                            "function %s not found" % functionPath)
         elif not callable(f):
             raise jsonrpclib.NoSuchFunction(jsonrpclib.METHOD_NOT_CALLABLE,
-                "function %s not callable" % functionPath)
+                                            "function %s not callable" % functionPath)
         else:
             return f
 
@@ -64,12 +64,12 @@ class BaseSubhandler:
 
 
 class BaseQueryFactory(protocol.ClientFactory):
-
     deferred = None
     protocol = None
 
     # XXX add an "id" parameter
     id = 0
+
     def __init__(self, method, version=jsonrpclib.VERSION_PRE1, *args):
         # XXX pass the "id" parameter here
         self.version = version
@@ -118,6 +118,7 @@ class BaseProxy:
     """
     A Proxy base class for making remote JSON-RPC calls.
     """
+
     def __init__(self, version=jsonrpclib.VERSION_PRE1, factoryClass=None):
         self.version = version
         self.factoryClass = factoryClass
@@ -197,7 +198,7 @@ class Introspection(BaseSubhandler):
         return getattr(method, 'signature', None) or ''
 
     jsonrpc_methodSignature.signature = [['array', 'string'],
-                                        ['string', 'string']]
+                                         ['string', 'string']]
 
 
 def addIntrospection(jsonrpc):
@@ -206,5 +207,5 @@ def addIntrospection(jsonrpc):
 
     @param jsonrpc: The jsonrpc server to add Introspection support to.
     """
-    #jsonrpc.putSubHandler('system', Introspection, ('protocol',))
+    # jsonrpc.putSubHandler('system', Introspection, ('protocol',))
     jsonrpc.putSubHandler('system', Introspection(jsonrpc))
