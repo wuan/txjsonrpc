@@ -26,7 +26,7 @@ import time
 try:
     from cStringIO import StringIO
 except ImportError:
-    from io import StringIO
+    from io import BytesIO as StringIO
 
 from twisted.web import resource, server
 from twisted.internet import defer, reactor
@@ -126,9 +126,9 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         request.content.seek(0, 0)
         # Unmarshal the JSON-RPC data.
         content = request.content.read()
-        if not content and request.method == 'GET' and request.args.has_key('request'):
+        if not content and request.method == 'GET' and 'request' in request.args:
             content = request.args['request'][0]
-        self.callback = request.args['callback'][0] if request.args.has_key('callback') else None
+        self.callback = request.args['callback'][0] if 'callback' in request.args else None
         self.is_jsonp = True if self.callback else False
         parsed = jsonrpclib.loads(content)
         functionPath = parsed.get("method")
@@ -188,7 +188,6 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         if result is not None:
             s = self._render_text(id, result, version, original_result)
             s = self._handle_compression(s, request, original_result)
-
             request.setHeader("content-length", str(len(s)))
             request.write(s)
 
@@ -226,9 +225,9 @@ class JSONRPC(resource.Resource, BaseSubhandler):
                 original_size = len(data)
                 start_time = time.time()
 
-                out_file = cStringIO.StringIO()
+                out_file = StringIO()
                 with gzip.GzipFile(mode='wb', fileobj=out_file) as in_file:
-                    in_file.write(data)
+                    in_file.write(data.encode())
                 data = out_file.getvalue()
 
                 compressed_size = len(data)
@@ -243,8 +242,10 @@ class JSONRPC(resource.Resource, BaseSubhandler):
                     original_result['result_jsongz'] = data
 
             request.setHeader("content-encoding", "gzip")
+            return data
+        else:
+            return data.encode()
 
-        return data
 
     def _ebRender(self, failure, id):
         if isinstance(failure.value, jsonrpclib.Fault):
