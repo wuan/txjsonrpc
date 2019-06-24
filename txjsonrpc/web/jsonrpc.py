@@ -23,7 +23,10 @@ except ImportError:
     import xmlrpc.client as xmlrpclib
 import gzip
 import time
-import cStringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
 
 from twisted.web import resource, server
 from twisted.internet import defer, reactor
