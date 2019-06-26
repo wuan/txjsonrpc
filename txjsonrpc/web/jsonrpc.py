@@ -233,7 +233,7 @@ class JSONRPC(resource.Resource, BaseSubhandler):
                 compressed_size = len(data)
                 elapsed_time = time.time() - start_time
                 break_even = (original_size - compressed_size) / elapsed_time / 1024 / 1024
-                print("compress data {} -> {} ({} %) in {:.2f} ms (break even at {:.1f} MB/s)".format(original_size,
+                print("compress data {} -> {} ({:.1f} %) in {:.2f} ms (break even at {:.1f} MB/s)".format(original_size,
                                                                                                       compressed_size,
                                                                                                       compressed_size * 100 / original_size,
                                                                                                       elapsed_time * 1000,
