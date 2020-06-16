@@ -206,7 +206,7 @@ class JSONRPC(resource.Resource, BaseSubhandler):
                 f = jsonrpclib.Fault(self.FAILURE, "can't serialize output")
                 s = jsonrpclib.dumps(f, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
                     self.callback, jsonrpclib.dumps(f, id=id, version=version))
-            if original_result and isinstance(original_result, dict):
+            if isinstance(original_result, dict):
                 original_result['result_json'] = s
             else:
                 print('original_result:', type(original_result))
