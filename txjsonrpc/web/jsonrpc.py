@@ -251,7 +251,7 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         if isinstance(failure.value, jsonrpclib.Fault):
             return failure.value
         log.err(failure)
-        message = failure.value.message
+        message = failure.value.message if hasattr(failure.value, 'message') else repr(failure.value)
         code = self._map_exception(type(failure.value))
         return jsonrpclib.Fault(code, message)
 
