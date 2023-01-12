@@ -130,6 +130,10 @@ class JSONRPC(resource.Resource, BaseSubhandler):
             content = request.args['request'][0]
         self.callback = request.args['callback'][0] if 'callback' in request.args else None
         self.is_jsonp = True if self.callback else False
+        if not self.is_jsonp:
+            request.setHeader("content-type", "application/json")
+        else:
+            request.setHeader("content-type", "text/javascript")
         parsed = jsonrpclib.loads(content)
         functionPath = parsed.get("method")
         params = parsed.get('params', {})
@@ -159,11 +163,6 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         except jsonrpclib.Fault as f:
             self._cbRender(f, request, id, version)
         else:
-            if not self.is_jsonp:
-                request.setHeader("content-type", "application/json")
-            else:
-                request.setHeader("content-type", "text/javascript")
-
             if hasattr(function, 'with_request'):
                 args = [request] + args
 
