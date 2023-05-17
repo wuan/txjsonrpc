@@ -196,7 +196,7 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         return original_result
 
     def _render_text(self, id, result, version, original_result):
-        if original_result and 'result_json' in original_result:
+        if isinstance(original_result, dict) and 'result_json' in original_result:
             s = original_result['result_json']
         else:
             try:
