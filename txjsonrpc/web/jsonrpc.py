@@ -51,12 +51,12 @@ def with_request(method):
     return method
 
 
-def requires_auth():
-    def inner(method):
-        method.requires_auth = True
-        return method
-
-    return inner
+def requires_auth(method):
+    """
+    Decorator to enable authentication before resolving the method.
+    """
+    method.requires_auth = True
+    return method
 
 
 class NoSuchFunction(Fault):
