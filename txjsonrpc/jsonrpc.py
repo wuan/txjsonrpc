@@ -91,6 +91,7 @@ class BaseQueryFactory(protocol.ClientFactory):
         try:
             # Convert the response from JSON-RPC to python.
             result = jsonrpclib.loads(contents)
+            print("result:", result)
             if self.version != jsonrpclib.VERSION_PRE1:
                 result = result["result"]
             elif isinstance(result, list):
