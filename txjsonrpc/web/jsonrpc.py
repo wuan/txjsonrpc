@@ -270,7 +270,7 @@ class QueryProtocol(http.HTTPClient):
         if self.factory.user:
             auth = '%s:%s' % (self.factory.user, self.factory.password)
             auth = codecs.encode(auth.encode(), 'base64')
-            self.sendHeader(b'Authorization', b'Basic %s' % (auth,))
+            self.sendHeader(b'Authorization', b'Basic ' + auth)
         self.endHeaders()
         self.transport.write(self.factory.payload.encode())
 

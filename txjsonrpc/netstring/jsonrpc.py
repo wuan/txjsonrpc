@@ -35,6 +35,7 @@ class JSONRPC(basic.NetstringReceiver, BaseSubhandler):
 
 
     def __init__(self, version=jsonrpclib.VERSION_2):
+        BaseSubhandler.__init__(self)
         self.version = version
 
     def __call__(self):
