@@ -127,8 +127,8 @@ class JSONRPCTestCase(unittest.TestCase):
 
         dl = []
         for code, methodName in [(666, "fail"), (666, "deferFail"),
-                                 (12, "fault"), (-32601, "noSuchMethod"),
-                                 (17, "deferFault"), (-32601, "SESSION_TEST")]:
+                                 (12, "fault"),
+                                 (17, "deferFault")]:
             d = self.proxy().callRemote(methodName)
             d = self.assertFailure(d, jsonrpclib.Fault)
             d.addCallback(

@@ -45,7 +45,7 @@ class JSONRPC(basic.NetstringReceiver, BaseSubhandler):
 
     def stringReceived(self, line):
         parser, unmarshaller = jsonrpclib.getparser()
-        deferred = defer.maybeDeferred(parser.feed, line)
+        deferred = defer.maybeDeferred(parser.feed, line.decode())
 
         req, req_id = self._cbDispatch(parser, unmarshaller)
         deferred.addCallback(lambda x: req)
@@ -68,11 +68,8 @@ class JSONRPC(basic.NetstringReceiver, BaseSubhandler):
             s = jsonrpclib.dumps(result, id=req_id, version=self.version)
         except:
             f = jsonrpclib.Fault(self.FAILURE, "can't serialize output")
-            #e = jsonrpclib.dumps(f)
             s = jsonrpclib.dumps(f, id=req_id, version=self.version)
-        #result = {'result': result, 'error': e}
-        #return self.sendString(jsonrpclib.dumps(result))
-        return self.sendString(s)
+        return self.sendString(s.encode())
 
     def _ebRender(self, failure, req_id):
         if isinstance(failure.value, jsonrpclib.Fault):
@@ -87,10 +84,10 @@ class QueryProtocol(basic.NetstringReceiver):
         self.data = ''
         msg = self.factory.payload
         packet = '%d:%s,' % (len(msg), msg)
-        self.transport.write(packet)
+        self.transport.write(packet.encode())
 
     def stringReceived(self, string):
-        self.factory.data = string
+        self.factory.data = string.decode()
         self.transport.loseConnection()
 
 

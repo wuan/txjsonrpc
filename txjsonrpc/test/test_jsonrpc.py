@@ -15,27 +15,27 @@ class BaseQueryFactoryTestCase(TestCase):
         factory = BaseQueryFactory("someMethod",version=VERSION_PRE1)
         payload = factory._buildVersionedPayload()
         self.assertEquals(
-            payload, '{"params": [], "method": ""}')
+            payload, '{"method": "", "params": []}')
 
     def test_buildVersionedPayload1(self):
         factory = BaseQueryFactory("someMethod", version=VERSION_1)
         payload = factory._buildVersionedPayload()
         self.assertEquals(
             payload,
-            '{"params": [], "method": "", "id": 1}')
+            '{"method": "", "params": [], "id": 1}')
 
     def test_buildVersionedPayload2(self):
         factory = BaseQueryFactory("someMethod", version=VERSION_2)
         payload = factory._buildVersionedPayload()
         self.assertEquals(
             payload,
-            '{"params": [], "jsonrpc": "2.0", "method": "", "id": 1}')
+            '{"jsonrpc": "2.0", "method": "", "params": [], "id": 1}')
 
     def test_parseResponseNoJSON(self):
 
         def check_error(error):
             self.assertEquals(
-                error.value.message, "No JSON object could be decoded")
+                error.value.msg, "Expecting value")
 
         factory = BaseQueryFactory("someMethod")
         d = factory.deferred

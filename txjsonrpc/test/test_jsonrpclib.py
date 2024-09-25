@@ -42,10 +42,8 @@ class DumpTestCase(TestCase):
     def test_errorVersion1(self):
         object = Fault("code", "message")
         result = dumps(object, version=VERSION_1)
-        self.assertEquals(
-            result,
-            ('{"id": null, "result": null, "error": {"fault": "Fault", '
-             '"faultCode": "code", "faultString": "message"}}'))
+        assert result == ('{"result": null, "error": {"fault": "Fault", '
+             '"faultCode": "code", "faultString": "message"}, "id": null}')
 
     def test_version2(self):
         object = {"some": "data"}
@@ -57,10 +55,8 @@ class DumpTestCase(TestCase):
     def test_errorVersion2(self):
         object = Fault("code", "message")
         result = dumps(object, version=VERSION_2)
-        self.assertEquals(
-            result,
-            ('{"jsonrpc": "2.0", "id": null, "error": {"message": "Fault", '
-                '"code": "code", "data": "message"}}'))
+        assert result == ('{"jsonrpc": "2.0", "error": {"message": "Fault", '
+                '"code": "code", "data": "message"}, "id": null}')
 
 
 class LoadsTestCase(TestCase):
@@ -70,7 +66,7 @@ class LoadsTestCase(TestCase):
         expectedResults = [1, "a", {"apple": 2}, [1, 2, "a", "b"]]
         for input, expected in zip(jsonInput, expectedResults):
             unmarshalled = loads(input)
-            self.assertEquals(unmarshalled, expected)
+            assert unmarshalled == expected
 
     def test_FaultLoads(self):
         dl = []

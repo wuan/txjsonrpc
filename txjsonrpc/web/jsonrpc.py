@@ -12,6 +12,8 @@ Maintainer: U{Duncan McGreggor<mailto:oubiwann@adytum.us>}
 """
 from __future__ import nested_scopes, print_function
 
+import codecs
+
 try:
     import urlparse
 except ImportError:
@@ -125,7 +127,7 @@ class JSONRPC(resource.Resource, BaseSubhandler):
     def render(self, request):
         request.content.seek(0, 0)
         # Unmarshal the JSON-RPC data.
-        content = request.content.read()
+        content = request.content.read().decode()
         if not content and request.method == 'GET' and 'request' in request.args:
             content = request.args['request'][0]
         self.callback = request.args['callback'][0] if 'callback' in request.args else None
@@ -187,7 +189,7 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         if result is not None:
             s = self._render_text(id, result, version, original_result)
             s = self._handle_compression(s, request, original_result)
-            request.setHeader("content-length", str(len(s)))
+            request.setHeader(b"content-length", str(len(s)))
             request.write(s)
 
         request.finish()
@@ -260,24 +262,25 @@ class JSONRPC(resource.Resource, BaseSubhandler):
 
 class QueryProtocol(http.HTTPClient):
     def connectionMade(self):
-        self.sendCommand('POST', self.factory.path)
-        self.sendHeader('User-Agent', 'Twisted/JSONRPClib')
-        self.sendHeader('Host', self.factory.host)
-        self.sendHeader('Content-type', 'application/json')
-        self.sendHeader('Content-length', str(len(self.factory.payload)))
+        self.sendCommand(b'POST', self.factory.path.encode())
+        self.sendHeader(b'User-Agent', b'Twisted/JSONRPClib')
+        self.sendHeader(b'Host', self.factory.host.encode())
+        self.sendHeader(b'Content-type', b'application/json')
+        self.sendHeader(b'Content-length', str(len(self.factory.payload)))
         if self.factory.user:
             auth = '%s:%s' % (self.factory.user, self.factory.password)
-            auth = auth.encode('base64').strip()
-            self.sendHeader('Authorization', 'Basic %s' % (auth,))
+            auth = codecs.encode(auth.encode(), 'base64')
+            self.sendHeader(b'Authorization', b'Basic %s' % (auth,))
         self.endHeaders()
-        self.transport.write(self.factory.payload)
+        self.transport.write(self.factory.payload.encode())
 
     def handleStatus(self, version, status, message):
+        status = status.decode()
         if status != '200':
             self.factory.badStatus(status, message)
 
     def handleResponse(self, contents):
-        self.factory.parseResponse(contents)
+        self.factory.parseResponse(contents.decode())
 
 
 class QueryFactory(BaseQueryFactory):
