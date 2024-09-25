@@ -137,6 +137,7 @@ class Proxy(BaseProxy):
 
     def callRemote(self, method, *args, **kwargs):
         version = self._getVersion(kwargs)
+        print("callRemote(version=", version,")")
         factoryClass = self._getFactoryClass(kwargs)
         factory = factoryClass(method, version, *args)
         reactor.connectTCP(self.host, self.port, factory)

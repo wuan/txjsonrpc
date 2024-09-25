@@ -190,7 +190,7 @@ class JSONRPC(resource.Resource, BaseSubhandler):
             s = self._render_text(id, result, version, original_result)
             s = self._handle_compression(s, request, original_result)
             request.setHeader(b"content-length", str(len(s)))
-            request.write(s)
+            request.write(s.encode())
 
         request.finish()
 
@@ -198,6 +198,7 @@ class JSONRPC(resource.Resource, BaseSubhandler):
 
     def _render_text(self, id, result, version, original_result):
         if isinstance(original_result, dict) and 'result_json' in original_result:
+            print("### take original result")
             s = original_result['result_json']
         else:
             try:
@@ -208,9 +209,8 @@ class JSONRPC(resource.Resource, BaseSubhandler):
                 s = jsonrpclib.dumps(f, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
                     self.callback, jsonrpclib.dumps(f, id=id, version=version))
             if isinstance(original_result, dict):
+                print("### set original result")
                 original_result['result_json'] = s
-            else:
-                print('original_result:', type(original_result))
         return s
 
     def _map_exception(self, exception):

@@ -218,7 +218,7 @@ class JSONRPCTestIntrospection(JSONRPCTestCase):
     def testListMethods(self):
 
         def cbMethods(meths):
-            print(meths)
+            print("methods:", meths)
             meths.sort()
             self.failUnlessEqual(
                 meths,

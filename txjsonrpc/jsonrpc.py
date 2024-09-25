@@ -126,7 +126,7 @@ class BaseProxy:
 
     def _getVersion(self, keywords):
         version = keywords.get("version")
-        if version == None:
+        if version is None:
             version = self.version
         return version
 
