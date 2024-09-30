@@ -17,6 +17,7 @@ mock = "^5.1.0"
 pytest-twisted = "^1.14.3"
 
 [tool.coverage.run]
+omit = ["**/test_*.py"]
 branch = true
 relative_files = true
 
