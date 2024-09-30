@@ -10,7 +10,7 @@ from twisted.internet import reactor, defer
 from twisted.trial import unittest
 
 from txjsonrpc import jsonrpclib
-from txjsonrpc.meta import version
+from txjsonrpc.jsonrpclib import VERSION_2
 from txjsonrpc.netstring import jsonrpc
 from txjsonrpc.netstring.jsonrpc import (
     JSONRPC, Proxy, QueryFactory)
@@ -25,7 +25,6 @@ class TestValueError(ValueError):
 
 
 class Test(JSONRPC):
-
     FAILURE = 666
     NOT_FOUND = jsonrpclib.METHOD_NOT_FOUND
 
@@ -39,7 +38,7 @@ class Test(JSONRPC):
         return a + b
 
     jsonrpc_add.signature = [['int', 'int', 'int'],
-                            ['double', 'double', 'double']]
+                             ['double', 'double', 'double']]
 
     def jsonrpc_pair(self, string, num):
         """
@@ -85,172 +84,133 @@ class Test(JSONRPC):
 class QueryFactoryTestCase(unittest.TestCase):
 
     def testCreation(self):
-
         factory = QueryFactory("mymethod", "myarg1", "myarg2")
         self.assertEquals(factory.protocol.MAX_LENGTH, 99999)
 
 
-class TestJsonRPC:
+@pytest.fixture
+def host_port():
+    server = reactor.listenTCP(0, jsonrpc.RPCFactory(Test),
+                               interface="127.0.0.1")
+    yield server.getHost().port
 
+    server.stopListening()
+
+
+@pytest.fixture
+def proxy(host_port):
+    return Proxy("127.0.0.1", host_port, version=VERSION_2)
+
+
+class TestJsonRPC:
     timeout = 2
 
-    @pytest.fixture
-    def host_port(self):
-        server = reactor.listenTCP(0, jsonrpc.RPCFactory(Test),
-                                   interface="127.0.0.1")
-        yield server.getHost().port
+    @pytest.mark.parametrize("method, args, expected", (
+            ("add", (2, 3), 5),
+            ("defer", ("a",), "a"),
+            ("dict", ({"a": 1}, "a"), 1),
+            ("pair", ("a", 1), ["a", 1]),
+            ("complex", (), {"a": ["b", "c", 12, []], "D": "foo"})
+    ))
+    async def testResults(self, proxy, method, args, expected):
+        response = await proxy.callRemote(method, *args)
+        assert response == expected
 
-        server.stopListening()
+    @pytest.mark.parametrize("code,method_name", (
+            (666, "fail"), (666, "deferFail"),
+            (12, "fault"),
+            (17, "deferFault")
+    ))
+    async def testErrors(self, proxy, code, method_name):
+        with pytest.raises(jsonrpclib.Fault) as exc_info:
+            await proxy.callRemote(method_name)
+
+        exc = exc_info.value
+        assert isinstance(exc, jsonrpclib.Fault)
+        assert exc.faultCode == code
+
+
+class TestJSONRPCClassMaxLength:
 
     @pytest.fixture
     def proxy(self, host_port):
-        return Proxy("127.0.0.1", host_port)
-
-    async def testResults(self, proxy):
-
-        inputOutput = [
-            ("add", (2, 3), 5),
-            ("defer", ("a",), "a"),
-            ("dict", ({"a": 1}, "a"), 1),
-            ("pair", ("a", 1), ["a", 1]),
-            ("complex", (), {"a": ["b", "c", 12, []], "D": "foo"})]
-
-        for meth, args, outp in inputOutput:
-            response = await proxy.callRemote(meth, *args)
-            assert response == outp
-
-    def testErrors(self):
-
-        dl = []
-        for code, methodName in [(666, "fail"), (666, "deferFail"),
-                                 (12, "fault"),
-                                 (17, "deferFault")]:
-            d = self.proxy().callRemote(methodName)
-            d = self.assertFailure(d, jsonrpclib.Fault)
-            d.addCallback(
-                lambda exc, code=code: self.assertEquals(exc.faultCode, code))
-            dl.append(d)
-        d = defer.DeferredList(dl, fireOnOneErrback=True)
-        d.addCallback(lambda ign: self.flushLoggedErrors())
-        return d
-
-
-class JSONRPCClassMaxLengthTestCase(TestJsonRPC):
-
-    def proxy(self):
-
         lengths = []
 
         class Factory(QueryFactory):
-
-            MAX_LENGTH = 1234
-
             def __init__(self, *args):
-                lengths.append(self.MAX_LENGTH)
+                lengths.append(1)
                 QueryFactory.__init__(self, *args)
 
-        proxy = Proxy("127.0.0.1", self.port, factoryClass=Factory)
+        proxy = Proxy("127.0.0.1", host_port, factoryClass=Factory)
         self.maxLengths = lengths
         return proxy
 
-    def testResults(self):
-
-        def checkMaxLength(result):
-            self.assertEquals(self.maxLengths, [1234])
-
-        d = TestJsonRPC.testResults(self)
-        d.addCallback(checkMaxLength)
-        return d
+    async def testResults(self, proxy):
+        response = await proxy.callRemote("add", *[2,3])
+        assert response["result"] == 5
+        assert self.maxLengths == [1]
 
 
-class JSONRPCMethodMaxLengthTestCase(TestJsonRPC):
+class TestJSONRPCMethodMaxLength:
 
-    def testResults(self):
-
-        lengths = []
-
-        inputOutput = [
+    @pytest.mark.parametrize("method_name, args, expected", (
             ("add", (2, 3), 5),
             ("defer", ("a",), "a"),
             ("dict", ({"a": 1}, "a"), 1),
             ("pair", ("a", 1), ["a", 1]),
-            ("complex", (), {"a": ["b", "c", 12, []], "D": "foo"})]
-
-        def checkMaxLength(result):
-            self.assertEquals(len(lengths), len(inputOutput))
-            self.assertEquals(lengths, [1234] * len(inputOutput))
+            ("complex", (), {"a": ["b", "c", 12, []], "D": "foo"})
+    ))
+    async def testResults(self, proxy, method_name, args, expected):
+        lengths = []
 
         class Factory(QueryFactory):
-
-            MAX_LENGTH = 1234
-
             def __init__(self, *args):
-                lengths.append(self.MAX_LENGTH)
+                lengths.append(1)
                 QueryFactory.__init__(self, *args)
 
-        def printError(error):
-            print("Error!")
-            print(error)
-
-        dl = []
-        for meth, args, outp in inputOutput:
-            d = self.proxy().callRemote(meth, factoryClass=Factory, *args)
-            d.addCallback(self.assertEquals, outp)
-            d.addErrback(printError)
-            dl.append(d)
-        d = defer.DeferredList(dl, fireOnOneErrback=True)
-        d.addCallback(checkMaxLength)
-        return d
+        d = await proxy.callRemote(method_name, factoryClass=Factory, *args)
+        assert d == expected
+        assert len(lengths) == 1
+        assert lengths == [1] * 1
 
 
-class JSONRPCTestIntrospection(TestJsonRPC):
+class TestJSONRPCIntrospection:
 
-    def setUp(self):
+    @pytest.fixture
+    def host_port(self):
         server = jsonrpc.RPCFactory(Test)
         server.addIntrospection()
-        self.p = reactor.listenTCP(0, server, interface="127.0.0.1")
-        self.port = self.p.getHost().port
+        server = reactor.listenTCP(0, server, interface="127.0.0.1")
+        yield server.getHost().port
+        server.stopListening()
 
-    def testListMethods(self):
+    async def testListMethods(self, proxy):
+        d = await proxy.callRemote("system.listMethods", version=2)
 
-        def cbMethods(meths):
-            print("methods:", meths)
-            meths.sort()
-            self.failUnlessEqual(
-                meths,
-                ['add', 'complex', 'defer', 'deferFail',
-                 'deferFault', 'dict', 'fail', 'fault',
-                 'pair', 'system.listMethods',
-                 'system.methodHelp',
-                 'system.methodSignature'])
+        d.sort()
+        assert d == ['add', 'complex', 'defer', 'deferFail',
+                     'deferFault', 'dict', 'fail', 'fault',
+                     'pair', 'system.listMethods',
+                     'system.methodHelp',
+                     'system.methodSignature']
 
-        d = self.proxy().callRemote("system.listMethods", version=2)
-        d.addCallback(cbMethods)
         return d
 
-    def testMethodHelp(self):
-        inputOutputs = [
+    @pytest.mark.parametrize("method_name, expected", (
             ("defer", "Help for defer."),
             ("fail", ""),
-            ("dict", "Help for dict.")]
+            ("dict", "Help for dict.")
+    ))
+    async def testMethodHelp(self, proxy, method_name, expected):
+        d = await proxy.callRemote("system.methodHelp", method_name, version=2)
+        assert d == expected
 
-        dl = []
-        for meth, expected in inputOutputs:
-            d = self.proxy().callRemote("system.methodHelp", meth, version=2)
-            d.addCallback(self.assertEquals, expected)
-            dl.append(d)
-        return defer.DeferredList(dl, fireOnOneErrback=True)
-
-    def testMethodSignature(self):
-        inputOutputs = [
+    @pytest.mark.parametrize("method_name, expected", (
             ("defer", ""),
             ("add", [['int', 'int', 'int'],
                      ['double', 'double', 'double']]),
-            ("pair", [['array', 'string', 'int']])]
-
-        dl = []
-        for meth, expected in inputOutputs:
-            d = self.proxy().callRemote("system.methodSignature", meth)
-            d.addCallback(self.assertEquals, expected)
-            dl.append(d)
-        return defer.DeferredList(dl, fireOnOneErrback=True)
+            ("pair", [['array', 'string', 'int']])
+    ))
+    async def testMethodSignature(self, proxy, method_name, expected):
+        response = await proxy.callRemote("system.methodSignature", method_name, version=2)
+        assert response == expected
