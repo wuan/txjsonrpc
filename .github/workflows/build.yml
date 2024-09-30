@@ -39,8 +39,7 @@ jobs:
 
       - name: Tests
         run: |
-          poetry run pytest --cov=txjsonrpc --cov-report xml:reports/coverage.xml --cov-report term --junitxml=reports/junit.xml
-          head -30 reports/coverage.xml
+          poetry run pytest --cov-report xml:reports/coverage.xml --cov-report term --junitxml=reports/junit.xml
 
       - name: Build
         run: poetry build
