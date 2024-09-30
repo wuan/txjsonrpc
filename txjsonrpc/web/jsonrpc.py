@@ -182,6 +182,7 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         return server.NOT_DONE_YET
 
     def _cbRender(self, original_result, request, id, version):
+        print("### _cbRender", original_result)
         result = original_result
         if isinstance(result, Handler):
             result = result.result
@@ -190,17 +191,22 @@ class JSONRPC(resource.Resource, BaseSubhandler):
             s = self._render_text(id, result, version, original_result)
             s = self._handle_compression(s, request, original_result)
             request.setHeader(b"content-length", str(len(s)))
-            request.write(s.encode())
+            print("response:", s)
+            request.write(s)
 
         request.finish()
 
         return original_result
 
     def _render_text(self, id, result, version, original_result):
+        print("*** render text", id, result)
         if isinstance(original_result, dict) and 'result_json' in original_result:
             print("### take original result")
             s = original_result['result_json']
         else:
+            if version == jsonrpclib.VERSION_PRE1:
+                if not isinstance(result, jsonrpclib.Fault):
+                    result = (result,)
             try:
                 s = jsonrpclib.dumps(result, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
                     self.callback, jsonrpclib.dumps(result, id=id, version=version))

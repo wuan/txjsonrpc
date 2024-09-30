@@ -4,10 +4,13 @@
 Test JSON-RPC over TCP support.
 """
 from __future__ import print_function
+
+import pytest
 from twisted.internet import reactor, defer
 from twisted.trial import unittest
 
 from txjsonrpc import jsonrpclib
+from txjsonrpc.meta import version
 from txjsonrpc.netstring import jsonrpc
 from txjsonrpc.netstring.jsonrpc import (
     JSONRPC, Proxy, QueryFactory)
@@ -87,22 +90,23 @@ class QueryFactoryTestCase(unittest.TestCase):
         self.assertEquals(factory.protocol.MAX_LENGTH, 99999)
 
 
-class JSONRPCTestCase(unittest.TestCase):
+class TestJsonRPC:
 
     timeout = 2
 
-    def setUp(self):
-        self.p = reactor.listenTCP(0, jsonrpc.RPCFactory(Test),
+    @pytest.fixture
+    def host_port(self):
+        server = reactor.listenTCP(0, jsonrpc.RPCFactory(Test),
                                    interface="127.0.0.1")
-        self.port = self.p.getHost().port
+        yield server.getHost().port
 
-    def tearDown(self):
-        return self.p.stopListening()
+        server.stopListening()
 
-    def proxy(self):
-        return Proxy("127.0.0.1", self.port)
+    @pytest.fixture
+    def proxy(self, host_port):
+        return Proxy("127.0.0.1", host_port)
 
-    def testResults(self):
+    async def testResults(self, proxy):
 
         inputOutput = [
             ("add", (2, 3), 5),
@@ -111,17 +115,9 @@ class JSONRPCTestCase(unittest.TestCase):
             ("pair", ("a", 1), ["a", 1]),
             ("complex", (), {"a": ["b", "c", 12, []], "D": "foo"})]
 
-        def printError(error):
-            print("Error!")
-            print(error)
-
-        dl = []
         for meth, args, outp in inputOutput:
-            d = self.proxy().callRemote(meth, *args)
-            d.addCallback(self.assertEquals, outp)
-            d.addErrback(printError)
-            dl.append(d)
-        return defer.DeferredList(dl, fireOnOneErrback=True)
+            response = await proxy.callRemote(meth, *args)
+            assert response == outp
 
     def testErrors(self):
 
@@ -139,7 +135,7 @@ class JSONRPCTestCase(unittest.TestCase):
         return d
 
 
-class JSONRPCClassMaxLengthTestCase(JSONRPCTestCase):
+class JSONRPCClassMaxLengthTestCase(TestJsonRPC):
 
     def proxy(self):
 
@@ -162,12 +158,12 @@ class JSONRPCClassMaxLengthTestCase(JSONRPCTestCase):
         def checkMaxLength(result):
             self.assertEquals(self.maxLengths, [1234])
 
-        d = JSONRPCTestCase.testResults(self)
+        d = TestJsonRPC.testResults(self)
         d.addCallback(checkMaxLength)
         return d
 
 
-class JSONRPCMethodMaxLengthTestCase(JSONRPCTestCase):
+class JSONRPCMethodMaxLengthTestCase(TestJsonRPC):
 
     def testResults(self):
 
@@ -207,7 +203,7 @@ class JSONRPCMethodMaxLengthTestCase(JSONRPCTestCase):
         return d
 
 
-class JSONRPCTestIntrospection(JSONRPCTestCase):
+class JSONRPCTestIntrospection(TestJsonRPC):
 
     def setUp(self):
         server = jsonrpc.RPCFactory(Test)
@@ -228,7 +224,7 @@ class JSONRPCTestIntrospection(JSONRPCTestCase):
                  'system.methodHelp',
                  'system.methodSignature'])
 
-        d = self.proxy().callRemote("system.listMethods")
+        d = self.proxy().callRemote("system.listMethods", version=2)
         d.addCallback(cbMethods)
         return d
 
@@ -240,7 +236,7 @@ class JSONRPCTestIntrospection(JSONRPCTestCase):
 
         dl = []
         for meth, expected in inputOutputs:
-            d = self.proxy().callRemote("system.methodHelp", meth)
+            d = self.proxy().callRemote("system.methodHelp", meth, version=2)
             d.addCallback(self.assertEquals, expected)
             dl.append(d)
         return defer.DeferredList(dl, fireOnOneErrback=True)

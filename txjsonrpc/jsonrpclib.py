@@ -28,13 +28,12 @@ INTERNAL_ERROR = xmlrpclib.INTERNAL_ERROR
 METHOD_NOT_CALLABLE = -32604
 
 # Version constants.
+
 VERSION_PRE1 = 0
 VERSION_1 = 1
 VERSION_2 = 2
 
-
-class Fault(xmlrpclib.Fault):
-    pass
+Fault = xmlrpclib.Fault
 
 
 class NoSuchFunction(Fault):
@@ -63,6 +62,7 @@ def dumps(obj, **kwargs):
         id = kwargs.pop("id")
     except KeyError:
         id = None
+
     if isinstance(obj, Exception):
         result = None
         if version != VERSION_2:
@@ -104,7 +104,7 @@ def loads(string, **kws):
         raise Fault(unmarshalled['faultCode'], unmarshalled['faultString'])
     if (isinstance(unmarshalled, dict) and "error" in unmarshalled):
         if "jsonrpc" in unmarshalled and unmarshalled["jsonrpc"] == "2.0":
-            raise Fault(unmarshalled["error"]['code'], unmarshalled["error"]['data'])
+            raise Fault(unmarshalled["error"]['code'], unmarshalled["error"]['message'])
         if unmarshalled['error']:
             raise Fault(unmarshalled["error"]['faultCode'], unmarshalled["error"]['faultString'])
     return unmarshalled
