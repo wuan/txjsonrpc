@@ -35,6 +35,7 @@ class JSONRPC(basic.NetstringReceiver, BaseSubhandler):
 
 
     def __init__(self, version=jsonrpclib.VERSION_2):
+        BaseSubhandler.__init__(self)
         self.version = version
 
     def __call__(self):
@@ -45,7 +46,7 @@ class JSONRPC(basic.NetstringReceiver, BaseSubhandler):
 
     def stringReceived(self, line):
         parser, unmarshaller = jsonrpclib.getparser()
-        deferred = defer.maybeDeferred(parser.feed, line)
+        deferred = defer.maybeDeferred(parser.feed, line.decode())
 
         req, req_id = self._cbDispatch(parser, unmarshaller)
         deferred.addCallback(lambda x: req)
@@ -55,24 +56,22 @@ class JSONRPC(basic.NetstringReceiver, BaseSubhandler):
 
     def _cbDispatch(self, parser, unmarshaller):
         parser.close()
+        print("### _cbDispatch", unmarshaller)
         args, functionPath, req_id  = unmarshaller.close(), unmarshaller.getmethodname(), unmarshaller.getid()
         function = self._getFunction(functionPath)
         return defer.maybeDeferred(function, *args), req_id
 
     def _cbRender(self, result, req_id):
-        if not isinstance(result, jsonrpclib.Fault):
+        print("### _cbRender", result, req_id, self.version)
+        if self.version == jsonrpclib.VERSION_PRE1 and not isinstance(result, jsonrpclib.Fault):
             result = (result,)
-        #s = None
-        #e = None
         try:
             s = jsonrpclib.dumps(result, id=req_id, version=self.version)
+            print("  ->", s)
         except:
             f = jsonrpclib.Fault(self.FAILURE, "can't serialize output")
-            #e = jsonrpclib.dumps(f)
             s = jsonrpclib.dumps(f, id=req_id, version=self.version)
-        #result = {'result': result, 'error': e}
-        #return self.sendString(jsonrpclib.dumps(result))
-        return self.sendString(s)
+        return self.sendString(s.encode())
 
     def _ebRender(self, failure, req_id):
         if isinstance(failure.value, jsonrpclib.Fault):
@@ -87,10 +86,10 @@ class QueryProtocol(basic.NetstringReceiver):
         self.data = ''
         msg = self.factory.payload
         packet = '%d:%s,' % (len(msg), msg)
-        self.transport.write(packet)
+        self.transport.write(packet.encode())
 
     def stringReceived(self, string):
-        self.factory.data = string
+        self.factory.data = string.decode()
         self.transport.loseConnection()
 
 
@@ -139,6 +138,7 @@ class Proxy(BaseProxy):
 
     def callRemote(self, method, *args, **kwargs):
         version = self._getVersion(kwargs)
+        print("callRemote(version=", version,")")
         factoryClass = self._getFactoryClass(kwargs)
         factory = factoryClass(method, version, *args)
         reactor.connectTCP(self.host, self.port, factory)
