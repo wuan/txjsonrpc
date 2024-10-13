@@ -2,6 +2,9 @@ from __future__ import print_function
 
 import os
 import sys
+
+import jsonrpclib
+
 sys.path.insert(0, os.getcwd())
 
 from twisted.internet import reactor
@@ -23,7 +26,7 @@ def shutDown(data):
     reactor.stop()
 
 
-proxy = Proxy('127.0.0.1', 7080)
+proxy = Proxy('127.0.0.1', 7080, version=jsonrpclib.VERSION_2)
 dl = []
 
 d = proxy.callRemote('system.listMethods')

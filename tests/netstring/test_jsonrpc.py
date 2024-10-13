@@ -16,15 +16,15 @@ from txjsonrpc.netstring.jsonrpc import (
     JSONRPC, Proxy, QueryFactory)
 
 
-class TestRuntimeError(RuntimeError):
+class RuntimeErrorTest(RuntimeError):
     pass
 
 
-class TestValueError(ValueError):
+class ValueErrorTest(ValueError):
     pass
 
 
-class Test(JSONRPC):
+class ResourceForTest(JSONRPC):
     FAILURE = 666
     NOT_FOUND = jsonrpclib.METHOD_NOT_FOUND
 
@@ -57,11 +57,11 @@ class Test(JSONRPC):
         return defer.succeed(x)
 
     def jsonrpc_deferFail(self):
-        return defer.fail(TestValueError())
+        return defer.fail(ValueErrorTest())
 
     def jsonrpc_fail(self):
         # Don't add a doc string, it's part of the test.
-        raise TestRuntimeError
+        raise RuntimeErrorTest
 
     def jsonrpc_fault(self):
         return jsonrpclib.Fault(12, "hello")
@@ -90,7 +90,7 @@ class QueryFactoryTestCase(unittest.TestCase):
 
 @pytest.fixture
 def host_port():
-    server = reactor.listenTCP(0, jsonrpc.RPCFactory(Test),
+    server = reactor.listenTCP(0, jsonrpc.RPCFactory(ResourceForTest),
                                interface="127.0.0.1")
     yield server.getHost().port
 
@@ -178,7 +178,7 @@ class TestJSONRPCIntrospection:
 
     @pytest.fixture
     def host_port(self):
-        server = jsonrpc.RPCFactory(Test)
+        server = jsonrpc.RPCFactory(ResourceForTest)
         server.addIntrospection()
         server = reactor.listenTCP(0, server, interface="127.0.0.1")
         yield server.getHost().port

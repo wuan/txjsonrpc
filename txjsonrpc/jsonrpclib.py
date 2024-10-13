@@ -99,7 +99,6 @@ def loads(string, **kws):
     # for versions greater than VERSION_PRE1, we'll have to check for the
     # "error" key, not the "fault" key... and then raise if "fault" is not
     # None.
-    print("unmarshalled:", unmarshalled)
     if (isinstance(unmarshalled, dict) and "fault" in unmarshalled):
         raise Fault(unmarshalled['faultCode'], unmarshalled['faultString'])
     if (isinstance(unmarshalled, dict) and "error" in unmarshalled):
