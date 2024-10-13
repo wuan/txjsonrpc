@@ -1,5 +1,8 @@
 import os
 import sys
+
+import jsonrpclib
+
 sys.path.insert(0, os.getcwd())
 
 from twisted.internet import reactor
@@ -17,6 +20,6 @@ def printError(error):
     reactor.stop()
 
 
-proxy = Proxy('127.0.0.1', 7080)
+proxy = Proxy('127.0.0.1', 7080, version=jsonrpclib.VERSION_2)
 proxy.callRemote('add', 3, 5).addCallbacks(printValue, printError)
 reactor.run()

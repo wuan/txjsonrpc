@@ -10,7 +10,6 @@ API Stability: unstable
 
 Maintainer: U{Duncan McGreggor<mailto:oubiwann@adytum.us>}
 """
-from __future__ import nested_scopes, print_function
 
 import codecs
 
@@ -191,7 +190,6 @@ class JSONRPC(resource.Resource, BaseSubhandler):
             s = self._render_text(id, result, version, original_result)
             s = self._handle_compression(s, request, original_result)
             request.setHeader(b"content-length", str(len(s)))
-            print("response:", s)
             request.write(s)
 
         request.finish()
@@ -199,9 +197,7 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         return original_result
 
     def _render_text(self, id, result, version, original_result):
-        print("*** render text", id, result)
         if isinstance(original_result, dict) and 'result_json' in original_result:
-            print("### take original result")
             s = original_result['result_json']
         else:
             if version == jsonrpclib.VERSION_PRE1:
@@ -215,7 +211,6 @@ class JSONRPC(resource.Resource, BaseSubhandler):
                 s = jsonrpclib.dumps(f, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
                     self.callback, jsonrpclib.dumps(f, id=id, version=version))
             if isinstance(original_result, dict):
-                print("### set original result")
                 original_result['result_json'] = s
         return s
 
@@ -253,7 +248,6 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         else:
             return data.encode()
 
-
     def _ebRender(self, failure, id):
         if isinstance(failure.value, jsonrpclib.Fault):
             return failure.value
@@ -283,7 +277,7 @@ class QueryProtocol(http.HTTPClient):
     def handleStatus(self, version, status, message):
         status = status.decode()
         if status != '200':
-            self.factory.badStatus(status, message)
+            self.factory.badStatus(status, message.decode())
 
     def handleResponse(self, contents):
         self.factory.parseResponse(contents.decode())

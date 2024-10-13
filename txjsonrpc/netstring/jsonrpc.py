@@ -56,18 +56,15 @@ class JSONRPC(basic.NetstringReceiver, BaseSubhandler):
 
     def _cbDispatch(self, parser, unmarshaller):
         parser.close()
-        print("### _cbDispatch", unmarshaller)
         args, functionPath, req_id  = unmarshaller.close(), unmarshaller.getmethodname(), unmarshaller.getid()
         function = self._getFunction(functionPath)
         return defer.maybeDeferred(function, *args), req_id
 
     def _cbRender(self, result, req_id):
-        print("### _cbRender", result, req_id, self.version)
         if self.version == jsonrpclib.VERSION_PRE1 and not isinstance(result, jsonrpclib.Fault):
             result = (result,)
         try:
             s = jsonrpclib.dumps(result, id=req_id, version=self.version)
-            print("  ->", s)
         except:
             f = jsonrpclib.Fault(self.FAILURE, "can't serialize output")
             s = jsonrpclib.dumps(f, id=req_id, version=self.version)
@@ -138,7 +135,6 @@ class Proxy(BaseProxy):
 
     def callRemote(self, method, *args, **kwargs):
         version = self._getVersion(kwargs)
-        print("callRemote(version=", version,")")
         factoryClass = self._getFactoryClass(kwargs)
         factory = factoryClass(method, version, *args)
         reactor.connectTCP(self.host, self.port, factory)

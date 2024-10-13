@@ -14,11 +14,11 @@ from txjsonrpc.web import jsonrpc
 from txjsonrpc.web.jsonrpc import with_request
 
 
-class TestRuntimeError(RuntimeError):
+class RuntimeErrorTest(RuntimeError):
     pass
 
 
-class TestValueError(ValueError):
+class ValueErrorTest(ValueError):
     pass
 
 
@@ -54,11 +54,11 @@ class JsonRpcTest(jsonrpc.JSONRPC):
         return defer.succeed(x)
 
     def jsonrpc_deferFail(self):
-        return defer.fail(TestValueError())
+        return defer.fail(ValueErrorTest())
 
     def jsonrpc_fail(self):
         # Don't add a doc string, it's part of the test.
-        raise TestRuntimeError
+        raise RuntimeErrorTest
 
     def jsonrpc_fault(self):
         return jsonrpclib.Fault(12, "hello")
