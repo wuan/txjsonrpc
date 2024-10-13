@@ -5,7 +5,6 @@ Test JSON-RPC support.
 """
 import pytest
 from twisted.internet import reactor, defer
-from twisted.trial import unittest
 from twisted.web import server, static
 from twisted.web.http import Request
 
@@ -73,6 +72,9 @@ class JsonRpcTest(jsonrpc.JSONRPC):
     def jsonrpc_dict(self, map, key):
         return map[key]
 
+    def jsonrpc_huge(self):
+        return "0123456789" * 100 + "X"
+
     @with_request
     def jsonrpc_with_request(self, request):
         return request is not None and isinstance(request, Request)
@@ -108,6 +110,14 @@ class AuthHeaderTest(JsonRpcTest):
 
 
 @pytest.fixture
+def site_port():
+    p = reactor.listenTCP(0, server.Site(JsonRpcTest()),
+                          interface="127.0.0.1")
+    yield p.getHost().port
+    p.stopListening()
+
+
+@pytest.fixture
 def proxy(site_port):
     print("default proxy", site_port)
     return jsonrpc.Proxy("http://127.0.0.1:%d/" % site_port)
@@ -118,32 +128,7 @@ def proxy_without_slash(site_port):
     return jsonrpc.Proxy("http://127.0.0.1:%d" % site_port)
 
 
-@pytest.fixture
-def proxy_version_pre1(site_port):
-    url = "http://127.0.0.1:%d/" % site_port
-    return jsonrpc.Proxy(url, version=jsonrpclib.VERSION_PRE1)
-
-
-@pytest.fixture
-def proxy_version_1(site_port):
-    url = "http://127.0.0.1:%d/" % site_port
-    return jsonrpc.Proxy(url, version=jsonrpclib.VERSION_1)
-
-
-@pytest.fixture
-def proxy_version_2(site_port):
-    url = "http://127.0.0.1:%d/" % site_port
-    return jsonrpc.Proxy(url, version=jsonrpclib.VERSION_2)
-
-
 class TestJSONRPCTest:
-
-    @pytest.fixture
-    def site_port(self):
-        p = reactor.listenTCP(0, server.Site(JsonRpcTest()),
-                              interface="127.0.0.1")
-        yield p.getHost().port
-        p.stopListening()
 
     @pytest.mark.parametrize("method, args, expected", (
             ("add", (2, 3), 5),
@@ -182,7 +167,7 @@ class TestJSONRPCIntrospection:
 
     async def test_list_methods(self, proxy):
         response = await proxy.callRemote("system.listMethods")
-        assert response == ['add', 'complex', 'defer', 'deferFail', 'deferFault', 'dict', 'fail', 'fault', 'none',
+        assert response == ['add', 'complex', 'defer', 'deferFail', 'deferFault', 'dict', 'fail', 'fault', 'huge', 'none',
                             'pair', 'system.listMethods', 'system.methodHelp', 'system.methodSignature', 'with_request']
 
     @pytest.mark.parametrize("method, expected", (
@@ -222,6 +207,7 @@ class TestProxyVersion1(TestJSONRPCTest):
     Tests for version 1.0.
     """
 
+    @pytest.fixture
     def proxy(self, site_port):
         url = "http://127.0.0.1:%d/" % site_port
         return jsonrpc.Proxy(url, version=jsonrpclib.VERSION_1)
@@ -232,9 +218,18 @@ class TestProxyVersion2(TestJSONRPCTest):
     Tests for the version 2.0.
     """
 
+    @pytest.fixture
     def proxy(self, site_port):
         url = "http://127.0.0.1:%d/" % site_port
         return jsonrpc.Proxy(url, version=jsonrpclib.VERSION_2)
+
+
+class TestCompression:
+
+    async def test_auth_info_in_URL(self, site_port):
+        proxy = jsonrpc.Proxy("http://127.0.0.1:%d/" % (site_port))
+        response = await proxy.callRemote("huge")
+        assert len(response) > 1000
 
 
 class TestAuthenticatedProxy(TestJSONRPCTest):
@@ -258,17 +253,17 @@ class TestAuthenticatedProxy(TestJSONRPCTest):
         return jsonrpc.Proxy("http://%s:%s@127.0.0.1:%d/" % (self.user, self.password, site_port))
 
     async def test_auth_info_in_URL(self, site_port):
-        proxy = jsonrpc.Proxy( "http://%s:%s@127.0.0.1:%d/" % (self.user, self.password, site_port))
+        proxy = jsonrpc.Proxy("http://%s:%s@127.0.0.1:%d/" % (self.user, self.password, site_port))
         response = await proxy.callRemote("authinfo")
         assert response == [self.user, self.password]
 
     async def testExplicitAuthInfo(self, site_port):
-        proxy = jsonrpc.Proxy( "http://127.0.0.1:%d/" % (site_port), self.user,self.password)
+        proxy = jsonrpc.Proxy("http://127.0.0.1:%d/" % (site_port), self.user, self.password)
         response = await proxy.callRemote("authinfo")
         assert response == [self.user, self.password]
 
     async def testExplicitAuthInfoOverride(self, site_port):
-        proxy = jsonrpc.Proxy( "http://wrong:info@127.0.0.1:%d/" % (site_port), self.user,self.password)
+        proxy = jsonrpc.Proxy("http://wrong:info@127.0.0.1:%d/" % (site_port), self.user, self.password)
         response = await proxy.callRemote("authinfo")
         assert response == [self.user, self.password]
 
