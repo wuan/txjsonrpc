@@ -3,8 +3,8 @@
 """
 Test JSON-RPC support.
 """
+import pytest
 from twisted.internet import reactor, defer
-from twisted.trial import unittest
 from twisted.web import server, static
 from twisted.web.http import Request
 
@@ -22,8 +22,7 @@ class TestValueError(ValueError):
     pass
 
 
-class Test(jsonrpc.JSONRPC):
-
+class JsonRpcTest(jsonrpc.JSONRPC):
     FAILURE = 666
     NOT_FOUND = jsonrpclib.METHOD_NOT_FOUND
     SESSION_EXPIRED = 42
@@ -36,7 +35,7 @@ class Test(jsonrpc.JSONRPC):
         return a + b
 
     jsonrpc_add.signature = [['int', 'int', 'int'],
-                            ['double', 'double', 'double']]
+                             ['double', 'double', 'double']]
 
     def jsonrpc_pair(self, string, num):
         """
@@ -73,6 +72,9 @@ class Test(jsonrpc.JSONRPC):
     def jsonrpc_dict(self, map, key):
         return map[key]
 
+    def jsonrpc_huge(self):
+        return "0123456789" * 100 + "X"
+
     @with_request
     def jsonrpc_with_request(self, request):
         return request is not None and isinstance(request, Request)
@@ -93,171 +95,144 @@ class Test(jsonrpc.JSONRPC):
     jsonrpc_dict.help = 'Help for dict.'
 
 
-class TestAuthHeader(Test):
+class AuthHeaderTest(JsonRpcTest):
     """
     This is used to get the header info so that we can test
     authentication.
     """
+
     def __init__(self):
-        Test.__init__(self)
-        self.request = None
+        JsonRpcTest.__init__(self)
 
-    def render(self, request):
-        self.request = request
-        return Test.render(self, request)
-
-    def jsonrpc_authinfo(self):
-        return self.request.getUser(), self.request.getPassword()
+    @with_request
+    def jsonrpc_authinfo(self, request):
+        return request.getUser().decode(), request.getPassword().decode()
 
 
-class JSONRPCTestCase(unittest.TestCase):
-
-    def setUp(self):
-        self.p = reactor.listenTCP(0, server.Site(Test()),
-                                   interface="127.0.0.1")
-        self.port = self.p.getHost().port
-
-    def tearDown(self):
-        return self.p.stopListening()
-
-    def proxy(self):
-        return jsonrpc.Proxy("http://127.0.0.1:%d/" % self.port)
-
-    def getExpectedOutput(self):
-        return [
-            5,
-            "a",
-            1,
-            ["a", 1],
-            "null",
-            {"a": ["b", "c", 12, []], "D": "foo"},
-            True]
-
-    def testResults(self):
-        input = [
-            ("add", (2, 3)),
-            ("defer", ("a",)),
-            ("dict", ({"a": 1}, "a")),
-            ("pair", ("a", 1)),
-            ("none", ()),
-            ("complex", ()),
-            ("with_request", ())]
-
-        dl = []
-        for methodAndArgs, output in zip(input, self.getExpectedOutput()):
-            method, args = methodAndArgs
-            d = self.proxy().callRemote(method, *args)
-            d.addCallback(self.assertEquals, output)
-            dl.append(d)
-        return defer.DeferredList(dl, fireOnOneErrback=True)
-
-    def testErrors(self):
-        dl = []
-        for code, methodName in [(666, "fail"), (666, "deferFail"),
-                                 (12, "fault"), (-32601, "noSuchMethod"),
-                                 (17, "deferFault"), (42, "SESSION_TEST")]:
-            d = self.proxy().callRemote(methodName)
-            d = self.assertFailure(d, jsonrpclib.Fault)
-            d.addCallback(
-                lambda exc, code=code: self.assertEquals(exc.faultCode, code))
-            dl.append(d)
-        d = defer.DeferredList(dl, fireOnOneErrback=True)
-        d.addCallback(lambda ign: self.flushLoggedErrors())
-        return d
+@pytest.fixture
+def site_port():
+    p = reactor.listenTCP(0, server.Site(JsonRpcTest()),
+                          interface="127.0.0.1")
+    yield p.getHost().port
+    p.stopListening()
 
 
-class JSONRPCTestIntrospection(JSONRPCTestCase):
+@pytest.fixture
+def proxy(site_port):
+    print("default proxy", site_port)
+    return jsonrpc.Proxy("http://127.0.0.1:%d/" % site_port)
 
-    def setUp(self):
-        jsonrpc = Test()
-        addIntrospection(jsonrpc)
-        self.p = reactor.listenTCP(
-            0, server.Site(jsonrpc), interface="127.0.0.1")
-        self.port = self.p.getHost().port
 
-    def testListMethods(self):
+@pytest.fixture
+def proxy_without_slash(site_port):
+    return jsonrpc.Proxy("http://127.0.0.1:%d" % site_port)
 
-        def cbMethods(meths):
-            meths.sort()
-            self.failUnlessEqual(
-                meths,
-                ['add', 'complex', 'defer', 'deferFail',
-                 'deferFault', 'dict', 'fail', 'fault',
-                 'none', 'pair', 'system.listMethods',
-                 'system.methodHelp',
-                 'system.methodSignature', 'with_request'])
 
-        d = self.proxy().callRemote("system.listMethods")
-        d.addCallback(cbMethods)
-        return d
+class TestJSONRPCTest:
 
-    def testMethodHelp(self):
-        inputOutputs = [
+    @pytest.mark.parametrize("method, args, expected", (
+            ("add", (2, 3), 5),
+            ("defer", ("a",), "a"),
+            ("dict", ({"a": 1}, "a"), 1),
+            ("pair", ("a", 1), ["a", 1]),
+            ("none", (), "null"),
+            ("complex", (), {"a": ["b", "c", 12, []], "D": "foo"}),
+            ("with_request", (), True)))
+    async def test_results(self, proxy, method, args, expected):
+        response = yield proxy.callRemote(method, *args)
+        assert response == expected
+
+    @pytest.mark.parametrize("code,method_name", (
+            (666, "fail"), (666, "deferFail"),
+            (12, "fault"), (-32601, "noSuchMethod"),
+            (17, "deferFault")
+    ))
+    async def test_errors(self, proxy, code, method_name):
+        with pytest.raises(jsonrpclib.Fault) as e_info:
+            response = await proxy.callRemote(method_name)
+        exc = e_info.value
+        assert exc.faultCode == code
+
+
+class TestJSONRPCIntrospection:
+
+    @pytest.fixture
+    def site_port(self):
+        json_rpc_test = JsonRpcTest()
+        addIntrospection(json_rpc_test)
+        p = reactor.listenTCP(0, server.Site(json_rpc_test),
+                              interface="127.0.0.1")
+        yield p.getHost().port
+        p.stopListening()
+
+    async def test_list_methods(self, proxy):
+        response = await proxy.callRemote("system.listMethods")
+        assert response == ['add', 'complex', 'defer', 'deferFail', 'deferFault', 'dict', 'fail', 'fault', 'huge', 'none',
+                            'pair', 'system.listMethods', 'system.methodHelp', 'system.methodSignature', 'with_request']
+
+    @pytest.mark.parametrize("method, expected", (
             ("defer", "Help for defer."),
             ("fail", ""),
-            ("dict", "Help for dict.")]
+            ("dict", "Help for dict.")
+    ))
+    async def testMethodHelp(self, proxy, method, expected):
+        response = await proxy.callRemote("system.methodHelp", method)
+        assert response == expected
 
-        dl = []
-        for meth, expected in inputOutputs:
-            d = self.proxy().callRemote("system.methodHelp", meth)
-            d.addCallback(self.assertEquals, expected)
-            dl.append(d)
-        return defer.DeferredList(dl, fireOnOneErrback=True)
-
-    def testMethodSignature(self):
-        inputOutputs = [
+    @pytest.mark.parametrize("method, expected", (
             ("defer", ""),
             ("add", [['int', 'int', 'int'],
                      ['double', 'double', 'double']]),
-            ("pair", [['array', 'string', 'int']])]
-
-        dl = []
-        for meth, expected in inputOutputs:
-            d = self.proxy().callRemote("system.methodSignature", meth)
-            d.addCallback(self.assertEquals, expected)
-            dl.append(d)
-        return defer.DeferredList(dl, fireOnOneErrback=True)
+            ("pair", [['array', 'string', 'int']])
+    ))
+    async def testMethodSignature(self, proxy, method, expected):
+        response = await proxy.callRemote("system.methodSignature", method)
+        assert response == expected
 
 
-class ProxyWithoutSlashTestCase(JSONRPCTestCase):
-    """
-    Test with proxy that doesn't add a slash.
-    """
-
-    def proxy(self):
-        return jsonrpc.Proxy("http://127.0.0.1:%d" % self.port)
-
-
-class ProxyVersionPre1TestCase(JSONRPCTestCase):
+class TestProxyVersionPre1(TestJSONRPCTest):
     """
     Tests for the the original, pre-version 1.0 spec that txJSON-RPC was
     originally released as.
     """
-    def proxy(self):
-        url = "http://127.0.0.1:%d/" % self.port
+
+    @pytest.fixture
+    def proxy(self, site_port):
+        url = "http://127.0.0.1:%d/" % site_port
         return jsonrpc.Proxy(url, version=jsonrpclib.VERSION_PRE1)
 
-class ProxyVersion1TestCase(JSONRPCTestCase):
+
+class TestProxyVersion1(TestJSONRPCTest):
     """
     Tests for version 1.0.
     """
-    def proxy(self):
-        url = "http://127.0.0.1:%d/" % self.port
+
+    @pytest.fixture
+    def proxy(self, site_port):
+        url = "http://127.0.0.1:%d/" % site_port
         return jsonrpc.Proxy(url, version=jsonrpclib.VERSION_1)
 
 
-
-class ProxyVersion2TestCase(JSONRPCTestCase):
+class TestProxyVersion2(TestJSONRPCTest):
     """
     Tests for the version 2.0.
     """
-    def proxy(self):
-        url = "http://127.0.0.1:%d/" % self.port
+
+    @pytest.fixture
+    def proxy(self, site_port):
+        url = "http://127.0.0.1:%d/" % site_port
         return jsonrpc.Proxy(url, version=jsonrpclib.VERSION_2)
 
 
+class TestCompression:
 
-class AuthenticatedProxyTestCase(JSONRPCTestCase):
+    async def test_auth_info_in_URL(self, site_port):
+        proxy = jsonrpc.Proxy("http://127.0.0.1:%d/" % (site_port))
+        response = await proxy.callRemote("huge")
+        assert len(response) > 1000
+
+
+class TestAuthenticatedProxy(TestJSONRPCTest):
     """
     Test with authenticated proxy. We run this with the same inout/ouput as
     above.
@@ -265,44 +240,47 @@ class AuthenticatedProxyTestCase(JSONRPCTestCase):
     user = "username"
     password = "asecret"
 
-    def setUp(self):
-        self.p = reactor.listenTCP(0, server.Site(TestAuthHeader()),
-                                   interface="127.0.0.1")
-        self.port = self.p.getHost().port
+    @pytest.fixture
+    def site_port(self):
+        print("*************************")
+        p = reactor.listenTCP(0, server.Site(AuthHeaderTest()),
+                              interface="127.0.0.1")
+        yield p.getHost().port
+        p.stopListening()
 
-    def testAuthInfoInURL(self):
-        p = jsonrpc.Proxy(
-            "http://%s:%s@127.0.0.1:%d/" % (self.user, self.password,
-            self.port))
-        d = p.callRemote("authinfo")
-        return d.addCallback(self.assertEquals, [self.user, self.password])
+    @pytest.fixture
+    def proxy(self, site_port):
+        return jsonrpc.Proxy("http://%s:%s@127.0.0.1:%d/" % (self.user, self.password, site_port))
 
-    def testExplicitAuthInfo(self):
-        p = jsonrpc.Proxy(
-            "http://127.0.0.1:%d/" % (self.port,), self.user, self.password)
-        d = p.callRemote("authinfo")
-        return d.addCallback(self.assertEquals, [self.user, self.password])
+    async def test_auth_info_in_URL(self, site_port):
+        proxy = jsonrpc.Proxy("http://%s:%s@127.0.0.1:%d/" % (self.user, self.password, site_port))
+        response = await proxy.callRemote("authinfo")
+        assert response == [self.user, self.password]
 
-    def testExplicitAuthInfoOverride(self):
-        p = jsonrpc.Proxy(
-            "http://wrong:info@127.0.0.1:%d/" % (self.port,), self.user,
-            self.password)
-        d = p.callRemote("authinfo")
-        return d.addCallback(self.assertEquals, [self.user, self.password])
+    async def testExplicitAuthInfo(self, site_port):
+        proxy = jsonrpc.Proxy("http://127.0.0.1:%d/" % (site_port), self.user, self.password)
+        response = await proxy.callRemote("authinfo")
+        assert response == [self.user, self.password]
+
+    async def testExplicitAuthInfoOverride(self, site_port):
+        proxy = jsonrpc.Proxy("http://wrong:info@127.0.0.1:%d/" % (site_port), self.user, self.password)
+        response = await proxy.callRemote("authinfo")
+        assert response == [self.user, self.password]
 
 
-class ProxyErrorHandlingTestCase(unittest.TestCase):
+class ProxyErrorHandlingTestCase:
 
-    def setUp(self):
-        self.resource = static.File(__file__)
-        self.resource.isLeaf = True
-        self.port = reactor.listenTCP(
-            0, server.Site(self.resource), interface='127.0.0.1')
+    @pytest.fixture
+    def site_port(self):
+        resource = static.File(__file__)
+        resource.isLeaf = True
+        p = reactor.listenTCP(0, server.Site(resource),
+                              interface="127.0.0.1")
+        yield p.getHost().port
+        p.stopListening()
 
-    def tearDown(self):
-        return self.port.stopListening()
-
-    def testErroneousResponse(self):
+    async def testErroneousResponse(self, site_port):
         proxy = jsonrpc.Proxy(
-            "http://127.0.0.1:%d/" % (self.port.getHost().port,))
-        return self.assertFailure(proxy.callRemote("someMethod"), Exception)
+            "http://127.0.0.1:%d/" % (site_port,))
+        return self.assertFailure(
+            await proxy.callRemote("someMethod"), Exception)
