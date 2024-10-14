@@ -12,8 +12,9 @@ Maintainer: U{Duncan McGreggor<mailto:oubiwann@adytum.us>}
 """
 
 import codecs
+import io
 
-from idna import valid_label_length
+from .render import renderer_factory
 
 try:
     import urlparse
@@ -25,11 +26,6 @@ try:
 except ImportError:
     import xmlrpc.client as xmlrpclib
 import gzip
-import time
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from io import BytesIO as StringIO, BytesIO
 
 from twisted.web import resource, server
 from twisted.internet import defer, reactor
@@ -182,72 +178,32 @@ class JSONRPC(resource.Resource, BaseSubhandler):
             request.notifyFinish().addErrback(_responseFailed, d)
         return server.NOT_DONE_YET
 
-    def _cbRender(self, original_result, request, id, version):
-        result = original_result
+    def _cbRender(self, result, request, id, version):
         if isinstance(result, Handler):
             result = result.result
 
         if result is not None:
-            s = self._render_text(id, result, version, original_result)
-            s = self._handle_compression(s, request, original_result)
-            request.setHeader(b"content-length", str(len(s)))
-            request.write(s)
+            renderer = renderer_factory(result, id, version, request)
+            renderer.render(self._render_text)
 
         request.finish()
+        return result
 
-        return original_result
-
-    def _render_text(self, id, result, version, original_result):
-        if isinstance(original_result, dict) and 'result_json' in original_result:
-            s = original_result['result_json']
-        else:
-            if version == jsonrpclib.VERSION_PRE1:
-                if not isinstance(result, jsonrpclib.Fault):
-                    result = (result,)
-            try:
-                s = jsonrpclib.dumps(result, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
-                    self.callback, jsonrpclib.dumps(result, id=id, version=version))
-            except:
-                f = jsonrpclib.Fault(self.FAILURE, "can't serialize output")
-                s = jsonrpclib.dumps(f, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
-                    self.callback, jsonrpclib.dumps(f, id=id, version=version))
-            if isinstance(original_result, dict):
-                original_result['result_json'] = s
+    def _render_text(self, result, id, version) -> str:
+        if version == jsonrpclib.VERSION_PRE1:
+            if not isinstance(result, jsonrpclib.Fault):
+                result = (result,)
+        try:
+            s = jsonrpclib.dumps(result, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
+                self.callback, jsonrpclib.dumps(result, id=id, version=version))
+        except:
+            f = jsonrpclib.Fault(self.FAILURE, "can't serialize output")
+            s = jsonrpclib.dumps(f, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
+                self.callback, jsonrpclib.dumps(f, id=id, version=version))
         return s
 
     def _map_exception(self, exception):
         return self.except_map.get(exception, self.FAILURE)
-
-    def _handle_compression(self, data, request, original_result):
-        accepted_encoding = request.getHeader('Accept-encoding')
-
-        if accepted_encoding == "gzip" and len(data) >= 1000:
-            if original_result and 'result_jsongz' in original_result:
-                data = original_result['result_jsongz']
-            else:
-                original_size = len(data)
-                start_time = time.time()
-
-                out_file = StringIO()
-                with gzip.GzipFile(mode='wb', fileobj=out_file) as in_file:
-                    in_file.write(data.encode())
-                data = out_file.getvalue()
-
-                compressed_size = len(data)
-                elapsed_time = time.time() - start_time
-                break_even = (original_size - compressed_size) / elapsed_time / 1024 / 1024
-                print("compress data {} -> {} ({:.1f} %) in {:.2f} ms (break even at {:.1f} MB/s)".format(original_size,
-                                                                                                      compressed_size,
-                                                                                                      compressed_size * 100 / original_size,
-                                                                                                      elapsed_time * 1000,
-                                                                                                      break_even))
-                if original_result and isinstance(original_result, dict):
-                    original_result['result_jsongz'] = data
-
-            request.setHeader("content-encoding", "gzip")
-            return data
-        else:
-            return data.encode()
 
     def _ebRender(self, failure, id):
         if isinstance(failure.value, jsonrpclib.Fault):
@@ -291,8 +247,7 @@ class QueryProtocol(http.HTTPClient):
 
     def handleResponse(self, contents):
         if self.response_headers.get("content-encoding") == "gzip":
-            compressed_file = BytesIO(contents)
-
+            compressed_file = io.BytesIO(contents)
             with gzip.GzipFile(mode='rb', fileobj=compressed_file) as in_file:
                 contents = in_file.read()
             compressed_file.close()

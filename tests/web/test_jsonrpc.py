@@ -11,6 +11,7 @@ from twisted.web.http import Request
 from txjsonrpc import jsonrpclib
 from txjsonrpc.jsonrpc import addIntrospection
 from txjsonrpc.web import jsonrpc
+from txjsonrpc.web.data import CacheableResult
 from txjsonrpc.web.jsonrpc import with_request
 
 
@@ -119,7 +120,6 @@ def site_port():
 
 @pytest.fixture
 def proxy(site_port):
-    print("default proxy", site_port)
     return jsonrpc.Proxy("http://127.0.0.1:%d/" % site_port)
 
 
@@ -149,7 +149,7 @@ class TestJSONRPCTest:
     ))
     async def test_errors(self, proxy, code, method_name):
         with pytest.raises(jsonrpclib.Fault) as e_info:
-            response = await proxy.callRemote(method_name)
+            await proxy.callRemote(method_name)
         exc = e_info.value
         assert exc.faultCode == code
 
@@ -193,7 +193,7 @@ class TestJSONRPCIntrospection:
 
 class TestCompressedJSONRPC(TestJSONRPCTest):
     """
-    Tests for the the original, pre-version 1.0 spec that txJSON-RPC was
+    Tests for the original, pre-version 1.0 spec that txJSON-RPC was
     originally released as.
     """
 
@@ -203,9 +203,69 @@ class TestCompressedJSONRPC(TestJSONRPCTest):
         return jsonrpc.Proxy(url, compress=True)
 
 
+class CacheableJsonRpcTest(jsonrpc.JSONRPC):
+    compressable_data = "0123456789" * 100 + "X"
+
+    compressed_cacheable_dict = {
+        "name": compressable_data
+    }
+
+    cacheable_dict = {
+        "name": "foo"
+    }
+
+    cacheable = CacheableResult("bar")
+
+    compressed_cacheable = CacheableResult(compressable_data)
+
+    def jsonrpc_cacheable_dict(self):
+        return self.cacheable_dict
+
+    def jsonrpc_cacheable_compressed_dict(self):
+        return self.compressed_cacheable_dict
+
+    def jsonrpc_cacheable(self):
+        return self.cacheable
+
+    def jsonrpc_cacheable_compressed(self):
+        return self.compressed_cacheable
+
+
+class TestCacheableJSONRPC:
+    """
+    Tests for the original, pre-version 1.0 spec that txJSON-RPC was
+    originally released as.
+    """
+
+    @pytest.fixture
+    def site_port(self):
+        cacheable_json_rpc_test = CacheableJsonRpcTest()
+        p = reactor.listenTCP(0, server.Site(cacheable_json_rpc_test),
+                              interface="127.0.0.1")
+        yield p.getHost().port
+        p.stopListening()
+
+    @pytest.fixture
+    def proxy(self, site_port):
+        url = "http://127.0.0.1:%d/" % site_port
+        return jsonrpc.Proxy(url, compress=True)
+
+    @pytest.mark.parametrize("method, expected", (
+            ("cacheable_dict", {"name": "foo"}),
+            ("cacheable_compressed_dict", {"name": CacheableJsonRpcTest.compressable_data}),
+            ("cacheable", "bar"),
+            ("cacheable_compressed", CacheableJsonRpcTest.compressable_data),
+    ))
+    async def test_cacheable(self, proxy, method, expected):
+        response = await proxy.callRemote(method)
+        assert response == expected
+        response = await proxy.callRemote(method)
+        assert response == expected
+
+
 class TestProxyVersionPre1(TestJSONRPCTest):
     """
-    Tests for the the original, pre-version 1.0 spec that txJSON-RPC was
+    Tests for the original, pre-version 1.0 spec that txJSON-RPC was
     originally released as.
     """
 

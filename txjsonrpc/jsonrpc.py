@@ -1,3 +1,5 @@
+from typing import List
+
 from twisted.internet import defer, protocol
 from twisted.python import reflect
 
@@ -158,7 +160,7 @@ class Introspection(BaseSubhandler):
         BaseSubhandler.__init__(self)
         self._jsonrpc_parent = parent
 
-    def jsonrpc_listMethods(self):
+    def jsonrpc_listMethods(self) -> List[str]:
         """
         Return a list of the method names implemented by this server.
         """
@@ -173,9 +175,7 @@ class Introspection(BaseSubhandler):
         functions.sort()
         return functions
 
-    jsonrpc_listMethods.signature = [['array']]
-
-    def jsonrpc_methodHelp(self, method):
+    def jsonrpc_methodHelp(self, method: str) -> str:
         """
         Return a documentation string describing the use of the given method.
         """
@@ -183,9 +183,7 @@ class Introspection(BaseSubhandler):
         return (getattr(method, 'help', None)
                 or getattr(method, '__doc__', None) or '').strip()
 
-    jsonrpc_methodHelp.signature = [['string', 'string']]
-
-    def jsonrpc_methodSignature(self, method):
+    def jsonrpc_methodSignature(self, method: str) -> str:
         """
         Return a list of type signatures.
 
@@ -196,9 +194,6 @@ class Introspection(BaseSubhandler):
         """
         method = self._jsonrpc_parent._getFunction(method)
         return getattr(method, 'signature', None) or ''
-
-    jsonrpc_methodSignature.signature = [['array', 'string'],
-                                         ['string', 'string']]
 
 
 def addIntrospection(jsonrpc):
