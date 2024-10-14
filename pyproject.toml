@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "txjsonrpc"
-version = "0.6.0"
+version = "0.7.0"
 description = "Code for creatig Twisted JSON-RPC servers and clients."
 authors = ["Duncan McGreggor <oubiwann@adytum.us>, Andreas Wuerl <andi@tryb.de>"]
 license = "BSD, GPL"
