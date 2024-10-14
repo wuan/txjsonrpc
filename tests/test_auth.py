@@ -3,7 +3,7 @@ from zope.interface import Interface
 from twisted.cred.checkers import InMemoryUsernamePasswordDatabaseDontUse
 from twisted.trial.unittest import TestCase
 
-from txjsonrpc.auth import HTTPAuthRealm, wrapResource
+from txjsonrpc_ng.auth import HTTPAuthRealm, wrapResource
 
 
 class HTTPAuthRealmTestCase(TestCase):

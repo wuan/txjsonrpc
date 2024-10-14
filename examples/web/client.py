@@ -1,7 +1,7 @@
 from __future__ import print_function
 from twisted.internet import reactor, defer
 
-from txjsonrpc.web.jsonrpc import Proxy
+from txjsonrpc_ng.web.jsonrpc import Proxy
 
 
 def printValue(value):

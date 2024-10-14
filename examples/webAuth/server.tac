@@ -4,8 +4,8 @@ from twisted.application import service, internet
 from twisted.cred.checkers import FilePasswordDB
 from twisted.web import server
 
-from txjsonrpc.auth import wrapResource
-from txjsonrpc.web import jsonrpc
+from txjsonrpc_ng.auth import wrapResource
+from txjsonrpc_ng.web import jsonrpc
 
 
 class Example(jsonrpc.JSONRPC):

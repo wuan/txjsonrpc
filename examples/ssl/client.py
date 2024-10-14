@@ -2,7 +2,7 @@ from __future__ import print_function
 
 import logging
 from twisted.internet import reactor, ssl
-from txjsonrpc.web.jsonrpc import Proxy
+from txjsonrpc_ng.web.jsonrpc import Proxy
 
 from OpenSSL import SSL
 from twisted.python import log

@@ -8,11 +8,11 @@ from twisted.internet import reactor, defer
 from twisted.web import server, static
 from twisted.web.http import Request
 
-from txjsonrpc import jsonrpclib
-from txjsonrpc.jsonrpc import addIntrospection
-from txjsonrpc.web import jsonrpc
-from txjsonrpc.web.data import CacheableResult
-from txjsonrpc.web.jsonrpc import with_request
+from txjsonrpc_ng import jsonrpclib
+from txjsonrpc_ng.jsonrpc import addIntrospection
+from txjsonrpc_ng.web import jsonrpc
+from txjsonrpc_ng.web.data import CacheableResult
+from txjsonrpc_ng.web.jsonrpc import with_request
 
 
 class RuntimeErrorTest(RuntimeError):

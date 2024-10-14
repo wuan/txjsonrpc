@@ -1,7 +1,7 @@
 from twisted.web import server
 from twisted.application import service, internet
 
-from txjsonrpc.web import jsonrpc
+from txjsonrpc_ng.web import jsonrpc
 
 
 class Example(jsonrpc.JSONRPC):

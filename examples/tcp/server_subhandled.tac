@@ -1,6 +1,6 @@
 from twisted.application import service, internet
 
-from txjsonrpc.netstring import jsonrpc
+from txjsonrpc_ng.netstring import jsonrpc
 
 
 class Example(jsonrpc.JSONRPC):

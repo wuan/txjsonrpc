@@ -4,7 +4,7 @@ import unittest
 from doctest import DocFileSuite, ELLIPSIS
 from glob import glob
 
-from txjsonrpc.testing.suite import buildDoctestSuite
+from txjsonrpc_ng.testing.suite import buildDoctestSuite
 
 if __name__ == '__main__':
     # To add a new module to the test runner, simply include is in the list below:

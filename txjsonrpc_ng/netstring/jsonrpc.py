@@ -11,8 +11,8 @@ from twisted.internet import defer, protocol, reactor
 from twisted.protocols import basic
 from twisted.python import log
 
-from txjsonrpc import jsonrpclib
-from txjsonrpc.jsonrpc import (
+from txjsonrpc_ng import jsonrpclib
+from txjsonrpc_ng.jsonrpc import (
     BaseProxy, BaseQueryFactory, BaseSubhandler, Introspection)
 
 

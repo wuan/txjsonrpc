@@ -3,7 +3,7 @@ from typing import List
 from twisted.internet import defer, protocol
 from twisted.python import reflect
 
-from txjsonrpc import jsonrpclib
+from txjsonrpc_ng import jsonrpclib
 
 
 class BaseSubhandler:

@@ -1,7 +1,7 @@
 from twisted.trial.unittest import TestCase
 
-from txjsonrpc.jsonrpc import BaseProxy, BaseQueryFactory
-from txjsonrpc.jsonrpclib import Fault, VERSION_PRE1, VERSION_1, VERSION_2
+from txjsonrpc_ng.jsonrpc import BaseProxy, BaseQueryFactory
+from txjsonrpc_ng.jsonrpclib import Fault, VERSION_PRE1, VERSION_1, VERSION_2
 
 
 class BaseQueryFactoryTestCase(TestCase):

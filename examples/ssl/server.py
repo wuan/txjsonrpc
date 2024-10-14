@@ -1,4 +1,4 @@
-from txjsonrpc.web import jsonrpc
+from txjsonrpc_ng.web import jsonrpc
 from twisted.web import server
 from twisted.internet import reactor, ssl
 
