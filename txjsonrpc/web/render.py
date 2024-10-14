@@ -30,8 +30,7 @@ class Renderer(metaclass=abc.ABCMeta):
                 response_binary = cached_response
             else:
                 start_time = time.time()
-
-                out_file = io.StringIO()
+                out_file = io.BytesIO()
                 with gzip.GzipFile(mode='wb', fileobj=out_file) as in_file:
                     in_file.write(response_string.encode())
                 response_binary = out_file.getvalue()

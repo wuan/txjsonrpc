@@ -119,7 +119,6 @@ def site_port():
 
 @pytest.fixture
 def proxy(site_port):
-    print("default proxy", site_port)
     return jsonrpc.Proxy("http://127.0.0.1:%d/" % site_port)
 
 
@@ -149,8 +148,7 @@ class TestJSONRPCTest:
     ))
     async def test_errors(self, proxy, code, method_name):
         with pytest.raises(jsonrpclib.Fault) as e_info:
-            response = await proxy.callRemote(method_name)
-            print("test_errors response:", response)
+            await proxy.callRemote(method_name)
         exc = e_info.value
         assert exc.faultCode == code
 

@@ -12,8 +12,7 @@ Maintainer: U{Duncan McGreggor<mailto:oubiwann@adytum.us>}
 """
 
 import codecs
-from dataclasses import dataclass
-from typing import Union, Dict, List, Optional
+import io
 
 from .render import renderer_factory
 
@@ -27,11 +26,6 @@ try:
 except ImportError:
     import xmlrpc.client as xmlrpclib
 import gzip
-
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from io import BytesIO as StringIO, BytesIO
 
 from twisted.web import resource, server
 from twisted.internet import defer, reactor
@@ -185,7 +179,6 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         return server.NOT_DONE_YET
 
     def _cbRender(self, result, request, id, version):
-        print("_cbRender:", result)
         if isinstance(result, Handler):
             result = result.result
 
@@ -194,8 +187,9 @@ class JSONRPC(resource.Resource, BaseSubhandler):
             renderer.render(self._render_text)
 
         request.finish()
+        return result
 
-    def _render_text(self, id, result, version) -> str:
+    def _render_text(self, result, id, version) -> str:
         if version == jsonrpclib.VERSION_PRE1:
             if not isinstance(result, jsonrpclib.Fault):
                 result = (result,)
@@ -206,7 +200,6 @@ class JSONRPC(resource.Resource, BaseSubhandler):
             f = jsonrpclib.Fault(self.FAILURE, "can't serialize output")
             s = jsonrpclib.dumps(f, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
                 self.callback, jsonrpclib.dumps(f, id=id, version=version))
-
         return s
 
     def _map_exception(self, exception):
@@ -254,8 +247,7 @@ class QueryProtocol(http.HTTPClient):
 
     def handleResponse(self, contents):
         if self.response_headers.get("content-encoding") == "gzip":
-            compressed_file = BytesIO(contents)
-
+            compressed_file = io.BytesIO(contents)
             with gzip.GzipFile(mode='rb', fileobj=compressed_file) as in_file:
                 contents = in_file.read()
             compressed_file.close()
