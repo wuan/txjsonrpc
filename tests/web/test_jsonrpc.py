@@ -150,6 +150,7 @@ class TestJSONRPCTest:
     async def test_errors(self, proxy, code, method_name):
         with pytest.raises(jsonrpclib.Fault) as e_info:
             response = await proxy.callRemote(method_name)
+            print("test_errors response:", response)
         exc = e_info.value
         assert exc.faultCode == code
 
