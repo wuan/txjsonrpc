@@ -27,6 +27,7 @@ class Renderer(metaclass=abc.ABCMeta):
         original_size = len(response_string)
         if compression == "gzip" and original_size >= 1000:
             if cached_response is not None:
+                print("renderer: using cached compressed response")
                 response_binary = cached_response
             else:
                 start_time = time.time()
@@ -38,7 +39,7 @@ class Renderer(metaclass=abc.ABCMeta):
                 compressed_size = len(response_binary)
                 elapsed_time = time.time() - start_time
                 break_even = (original_size - compressed_size) / elapsed_time / 1024 / 1024
-                print("compress data {} -> {} ({:.1f} %) in {:.2f} ms (break even at {:.1f} MB/s)".format(original_size,
+                print("renderer: compress data {} -> {} ({:.1f} %) in {:.2f} ms (break even at {:.1f} MB/s)".format(original_size,
                                                                                                           compressed_size,
                                                                                                           compressed_size * 100 / original_size,
                                                                                                           elapsed_time * 1000,
