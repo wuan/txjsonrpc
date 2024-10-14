@@ -5,14 +5,12 @@ http://cheeseshop.python.org/pypi/simplejson
 try:
     import xmlrpclib
 except ImportError:
+
     import xmlrpc.client as xmlrpclib
 
 from datetime import datetime
 
-try:
-    import json
-except ImportError:
-    import simplejson as json
+import json
 
 # From xmlrpclib.
 SERVER_ERROR = xmlrpclib.SERVER_ERROR

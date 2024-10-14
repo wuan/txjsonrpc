@@ -18,11 +18,11 @@ class Renderer(metaclass=abc.ABCMeta):
         self.request = request
 
     @abc.abstractmethod
-    def render(self, string_renderer: Callable[[Any, str, int], str]) -> bytes:
+    def render(self, string_renderer: Callable[[Any, str, int], str]) -> None:
         pass
 
     def handle_compression(self, response_string: str, cached_response: Optional[bytes],
-                           cache_updater: Optional[Callable[bytes]]) -> None:
+                           cache_updater: Optional[Callable[[bytes], None]]) -> None:
         compression = self.request.getHeader('Accept-encoding')
         original_size = len(response_string)
         if compression == "gzip" and original_size >= 1000:
@@ -60,7 +60,7 @@ class DefaultRenderer(Renderer):
         super().__init__(id, version, request)
         self.result = result
 
-    def render(self, string_renderer: Callable[[Any, str, int], str]) -> bytes:
+    def render(self, string_renderer: Callable[[Any, str, int], str]) -> None:
         result_string = string_renderer(self.result, self.id, self.version)
 
         self.handle_compression(result_string, None, None)
@@ -74,7 +74,7 @@ class CacheableDictRenderer(Renderer):
         super().__init__(id, version, request)
         self.result = result
 
-    def render(self, call: Callable[dict, str, int]) -> None:
+    def render(self, call: Callable[[Any, str, int], str]) -> None:
         if self.RESULT_STRING_KEY in self.result:
             result_string = self.result[self.RESULT_STRING_KEY]
         else:
@@ -97,7 +97,7 @@ class CacheableResultRenderer(Renderer):
         super().__init__(id, version, request)
         self.result = result
 
-    def render(self, call: Callable[Any, str, int]) -> None:
+    def render(self, call: Callable[[Any, str, int], str]) -> None:
         if self.result.string_value is not None:
             string_value = self.result.string_value
         else:
