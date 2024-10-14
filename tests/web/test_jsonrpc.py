@@ -3,6 +3,9 @@
 """
 Test JSON-RPC support.
 """
+import gzip
+import io
+
 import pytest
 from twisted.internet import reactor, defer
 from twisted.web import server, static
@@ -206,23 +209,9 @@ class TestCompressedJSONRPC(TestJSONRPCTest):
 class CacheableJsonRpcTest(jsonrpc.JSONRPC):
     compressable_data = "0123456789" * 100 + "X"
 
-    compressed_cacheable_dict = {
-        "name": compressable_data
-    }
-
-    cacheable_dict = {
-        "name": "foo"
-    }
-
     cacheable = CacheableResult("bar")
 
     compressed_cacheable = CacheableResult(compressable_data)
-
-    def jsonrpc_cacheable_dict(self):
-        return self.cacheable_dict
-
-    def jsonrpc_cacheable_compressed_dict(self):
-        return self.compressed_cacheable_dict
 
     def jsonrpc_cacheable(self):
         return self.cacheable
@@ -251,14 +240,20 @@ class TestCacheableJSONRPC:
         return jsonrpc.Proxy(url, compress=True)
 
     @pytest.mark.parametrize("method, expected", (
-            ("cacheable_dict", {"name": "foo"}),
-            ("cacheable_compressed_dict", {"name": CacheableJsonRpcTest.compressable_data}),
             ("cacheable", "bar"),
             ("cacheable_compressed", CacheableJsonRpcTest.compressable_data),
     ))
     async def test_cacheable(self, proxy, method, expected):
         response = await proxy.callRemote(method)
         assert response == expected
+        if method == "cacheable":
+            assert CacheableJsonRpcTest.cacheable.string_value is not None
+        elif method == "cacheable_compressed":
+            compressed_data = io.BytesIO(CacheableJsonRpcTest.compressed_cacheable.compressed_value)
+            with gzip.GzipFile(mode='rb', fileobj=compressed_data) as in_file:
+                contents = in_file.read()
+            compressed_data.close()
+            assert contents.decode() == CacheableJsonRpcTest.compressed_cacheable.string_value
         response = await proxy.callRemote(method)
         assert response == expected
 

@@ -6,7 +6,6 @@ from collections.abc import Callable
 from typing import Any, Optional
 
 from twisted.web.http import Request
-from typing_extensions import deprecated
 
 from .data import CacheableResult
 
@@ -65,31 +64,6 @@ class DefaultRenderer(Renderer):
         result_string = string_renderer(self.result, self.id, self.version)
 
         self.handle_compression(result_string, None, None)
-
-@deprecated("this support for caching all dict data is deprecated, use `CacheableResult` instead")
-class CacheableDictRenderer(Renderer):
-    RESULT_STRING_KEY = "result_text"
-    RESULT_COMPRESSED_KEY = "result_gzip"
-
-    def __init__(self, result: dict, id: str, version: int, request: Request):
-        super().__init__(id, version, request)
-        self.result = result
-
-    def render(self, call: Callable[[Any, str, int], str]) -> None:
-        if self.RESULT_STRING_KEY in self.result:
-            result_string = self.result[self.RESULT_STRING_KEY]
-        else:
-            result_string = call(self.result, self.id, self.version)
-            self.result[self.RESULT_STRING_KEY] = result_string
-
-        def update_value(compressed_value: bytes) -> None:
-            self.result[self.RESULT_COMPRESSED_KEY] = compressed_value
-
-        self.handle_compression(
-            result_string,
-            self.result.get(self.RESULT_COMPRESSED_KEY),
-            update_value
-        )
 
 
 class CacheableResultRenderer(Renderer):
