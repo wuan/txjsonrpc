@@ -68,7 +68,7 @@ class DefaultRenderer(Renderer):
 
 class CacheableDictRenderer(Renderer):
     RESULT_STRING_KEY = "result_text"
-    RESULT_COMPRESSED_KEY = "result_text"
+    RESULT_COMPRESSED_KEY = "result_gzip"
 
     def __init__(self, result: dict, id: str, version: int, request: Request):
         super().__init__(id, version, request)
