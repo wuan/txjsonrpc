@@ -167,7 +167,8 @@ class TestJSONRPCIntrospection:
 
     async def test_list_methods(self, proxy):
         response = await proxy.callRemote("system.listMethods")
-        assert response == ['add', 'complex', 'defer', 'deferFail', 'deferFault', 'dict', 'fail', 'fault', 'huge', 'none',
+        assert response == ['add', 'complex', 'defer', 'deferFail', 'deferFault', 'dict', 'fail', 'fault', 'huge',
+                            'none',
                             'pair', 'system.listMethods', 'system.methodHelp', 'system.methodSignature', 'with_request']
 
     @pytest.mark.parametrize("method, expected", (
@@ -188,6 +189,18 @@ class TestJSONRPCIntrospection:
     async def testMethodSignature(self, proxy, method, expected):
         response = await proxy.callRemote("system.methodSignature", method)
         assert response == expected
+
+
+class TestCompressedJSONRPC(TestJSONRPCTest):
+    """
+    Tests for the the original, pre-version 1.0 spec that txJSON-RPC was
+    originally released as.
+    """
+
+    @pytest.fixture
+    def proxy(self, site_port):
+        url = "http://127.0.0.1:%d/" % site_port
+        return jsonrpc.Proxy(url, compress=True)
 
 
 class TestProxyVersionPre1(TestJSONRPCTest):
@@ -226,8 +239,8 @@ class TestProxyVersion2(TestJSONRPCTest):
 
 class TestCompression:
 
-    async def test_auth_info_in_URL(self, site_port):
-        proxy = jsonrpc.Proxy("http://127.0.0.1:%d/" % (site_port))
+    async def test_compressed_payload(self, site_port):
+        proxy = jsonrpc.Proxy("http://127.0.0.1:%d/" % (site_port), compress=True)
         response = await proxy.callRemote("huge")
         assert len(response) > 1000
 
@@ -242,7 +255,6 @@ class TestAuthenticatedProxy(TestJSONRPCTest):
 
     @pytest.fixture
     def site_port(self):
-        print("*************************")
         p = reactor.listenTCP(0, server.Site(AuthHeaderTest()),
                               interface="127.0.0.1")
         yield p.getHost().port

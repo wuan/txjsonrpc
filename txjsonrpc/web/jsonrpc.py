@@ -13,6 +13,8 @@ Maintainer: U{Duncan McGreggor<mailto:oubiwann@adytum.us>}
 
 import codecs
 
+from idna import valid_label_length
+
 try:
     import urlparse
 except ImportError:
@@ -27,7 +29,7 @@ import time
 try:
     from cStringIO import StringIO
 except ImportError:
-    from io import BytesIO as StringIO
+    from io import BytesIO as StringIO, BytesIO
 
 from twisted.web import resource, server
 from twisted.internet import defer, reactor
@@ -181,7 +183,6 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         return server.NOT_DONE_YET
 
     def _cbRender(self, original_result, request, id, version):
-        print("### _cbRender", original_result)
         result = original_result
         if isinstance(result, Handler):
             result = result.result
@@ -261,11 +262,17 @@ class JSONRPC(resource.Resource, BaseSubhandler):
 
 
 class QueryProtocol(http.HTTPClient):
+
+    def __init__(self):
+        self.response_headers = {}
+
     def connectionMade(self):
         self.sendCommand(b'POST', self.factory.path.encode())
         self.sendHeader(b'User-Agent', b'Twisted/JSONRPClib')
         self.sendHeader(b'Host', self.factory.host.encode())
         self.sendHeader(b'Content-type', b'application/json')
+        if self.factory.compress:
+            self.sendHeader(b'Accept-encoding', b'gzip')
         self.sendHeader(b'Content-length', str(len(self.factory.payload)))
         if self.factory.user:
             auth = '%s:%s' % (self.factory.user, self.factory.password)
@@ -279,7 +286,16 @@ class QueryProtocol(http.HTTPClient):
         if status != '200':
             self.factory.badStatus(status, message.decode())
 
+    def handleHeader(self, key, val):
+        self.response_headers[key.decode().lower()] = val.decode()
+
     def handleResponse(self, contents):
+        if self.response_headers.get("content-encoding") == "gzip":
+            compressed_file = BytesIO(contents)
+
+            with gzip.GzipFile(mode='rb', fileobj=compressed_file) as in_file:
+                contents = in_file.read()
+            compressed_file.close()
         self.factory.parseResponse(contents.decode())
 
 
@@ -288,10 +304,11 @@ class QueryFactory(BaseQueryFactory):
     protocol = QueryProtocol
 
     def __init__(self, path, host, method, user=None, password=None,
-                 version=jsonrpclib.VERSION_PRE1, *args):
+                 version=jsonrpclib.VERSION_PRE1, compress=False, *args):
         BaseQueryFactory.__init__(self, method, version, *args)
         self.path, self.host = path, host
         self.user, self.password = user, password
+        self.compress = compress
 
 
 class Proxy(BaseProxy):
@@ -305,7 +322,7 @@ class Proxy(BaseProxy):
     """
 
     def __init__(self, url, user=None, password=None,
-                 version=jsonrpclib.VERSION_PRE1, factoryClass=QueryFactory, ssl_ctx_factory=None):
+                 version=jsonrpclib.VERSION_PRE1, compress=False, factoryClass=QueryFactory, ssl_ctx_factory=None):
         """
         @type url: C{str}
         @param url: The URL to which to post method calls.  Calls will be made
@@ -361,7 +378,7 @@ class Proxy(BaseProxy):
             self.user = user
         if password is not None:
             self.password = password
-
+        self.compress = compress
         self.ssl_ctx_factory = ssl_ctx_factory
 
     def callRemote(self, method, *args, **kwargs):
@@ -369,7 +386,7 @@ class Proxy(BaseProxy):
         # XXX generate unique id and pass it as a parameter
         factoryClass = self._getFactoryClass(kwargs)
         factory = factoryClass(self.path, self.host, method, self.user,
-                               self.password, version, *args)
+                               self.password, version, self.compress, *args)
         if self.secure:
             from twisted.internet import ssl
             if self.ssl_ctx_factory is None:
