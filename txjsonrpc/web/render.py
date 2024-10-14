@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import Any, Optional
 
 from twisted.web.http import Request
+from typing_extensions import deprecated
 
 from .data import CacheableResult
 
@@ -65,7 +66,7 @@ class DefaultRenderer(Renderer):
 
         self.handle_compression(result_string, None, None)
 
-
+@deprecated("this support for caching all dict data is deprecated, use `CacheableResult` instead")
 class CacheableDictRenderer(Renderer):
     RESULT_STRING_KEY = "result_text"
     RESULT_COMPRESSED_KEY = "result_gzip"
