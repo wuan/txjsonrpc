@@ -93,7 +93,5 @@ class CacheableResultRenderer(Renderer):
 def renderer_factory(result, id, version, request: Request):
     if isinstance(result, CacheableResult):
         return CacheableResultRenderer(result, id, version, request)
-    elif isinstance(result, dict):
-        return CacheableDictRenderer(result, id, version, request)
     else:
         return DefaultRenderer(result, id, version, request)
