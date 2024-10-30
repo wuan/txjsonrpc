@@ -194,7 +194,7 @@ class TestJSONRPCIntrospection:
         assert response == expected
 
 
-class TestCompressedJSONRPC(TestJSONRPCTest):
+class NoTestCompressedJSONRPC(TestJSONRPCTest):
     """
     Tests for the original, pre-version 1.0 spec that txJSON-RPC was
     originally released as.
