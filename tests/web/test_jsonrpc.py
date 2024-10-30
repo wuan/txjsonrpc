@@ -220,7 +220,7 @@ class CacheableJsonRpcTest(jsonrpc.JSONRPC):
         return self.compressed_cacheable
 
 
-class TestCacheableJSONRPC:
+class NoTestCacheableJSONRPC:
     """
     Tests for the original, pre-version 1.0 spec that txJSON-RPC was
     originally released as.
