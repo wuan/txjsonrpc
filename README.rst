@@ -10,6 +10,9 @@
 .. image:: https://sonarcloud.io/api/project_badges/measure?project=wuan_txjsonrpc&metric=reliability_rating
     :alt: Reliability rating
     :target: https://sonarcloud.io/project/overview?id=wuan_txjsonrpc
+.. image:: https://api.scorecard.dev/projects/github.com/wuan/txjsonrpc/badge
+    :alt: OpenSSF Scorecard
+    :target: https://scorecard.dev/viewer/?uri=github.com/wuan/txjsonrpc
 
 ============
 txjsonrpc
