@@ -115,6 +115,7 @@ class BaseQueryFactory(protocol.ClientFactory):
         self.deferred.errback(ValueError(status, message))
         self.deferred = None
 
+# see https://docs.twisted.org/en/stable/web/howto/client.html
 
 class BaseProxy:
     """

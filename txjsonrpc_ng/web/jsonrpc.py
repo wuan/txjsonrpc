@@ -14,6 +14,9 @@ Maintainer: U{Duncan McGreggor<mailto:oubiwann@adytum.us>}
 import codecs
 import io
 
+from twisted.web.client import Agent
+from twisted.web.http_headers import Headers
+
 from .render import renderer_factory
 
 try:
@@ -30,7 +33,7 @@ import gzip
 from twisted.web import resource, server
 from twisted.internet import defer, reactor
 from twisted.python import log, context
-from twisted.web import http
+from twisted.web import client
 
 from txjsonrpc_ng import jsonrpclib
 from txjsonrpc_ng.jsonrpc import BaseProxy, BaseQueryFactory, BaseSubhandler
@@ -217,25 +220,26 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         return True
 
 
-class QueryProtocol(http.HTTPClient):
+class QueryProtocol:
 
     def __init__(self):
+        self.agent = Agent(reactor)
         self.response_headers = {}
 
     def connectionMade(self):
-        self.sendCommand(b'POST', self.factory.path.encode())
-        self.sendHeader(b'User-Agent', b'Twisted/JSONRPClib')
-        self.sendHeader(b'Host', self.factory.host.encode())
-        self.sendHeader(b'Content-type', b'application/json')
+        headers = Headers({
+            'User-Agent': 'Twisted/JSONRPClib',
+            'Host': self.factory.host,
+            'Content-type': 'application/json',
+            'Content-length': str(len(self.factory.payload)),
+        })
         if self.factory.compress:
-            self.sendHeader(b'Accept-encoding', b'gzip')
-        self.sendHeader(b'Content-length', str(len(self.factory.payload)))
+            headers.addRawHeader('Accept-encoding', 'gzip')
         if self.factory.user:
             auth = '%s:%s' % (self.factory.user, self.factory.password)
             auth = codecs.encode(auth.encode(), 'base64')
-            self.sendHeader(b'Authorization', b'Basic ' + auth)
-        self.endHeaders()
-        self.transport.write(self.factory.payload.encode())
+            headers.addRawHeader('Authorization', 'Basic ' + auth)
+        self.request('POST', self.factory.path, headers, self.factory.payload)
 
     def handleStatus(self, version, status, message):
         status = status.decode()
