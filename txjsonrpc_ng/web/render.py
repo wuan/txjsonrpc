@@ -27,7 +27,6 @@ class Renderer(metaclass=abc.ABCMeta):
         original_size = len(response_string)
         if compression == "gzip" and original_size >= 1000:
             if cached_response is not None:
-                print("renderer: using cached compressed response")
                 response_binary = cached_response
             else:
                 start_time = time.time()
