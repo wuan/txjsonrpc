@@ -9,7 +9,7 @@ if [[ "$1" == "$FLAG" ]];then
 else
     # send the output (stdout and stderr) to both a file for checking and
     # stdout for immediate viewing/feedback purposes
-    ./runExamples.py || error " ERROR: examples failed"
+    ./admin/runExamples.py || error " ERROR: examples failed"
     ./admin/testDocs.py 2>&1|tee doctest.out
     trial $LIB 2>&1|tee test.out
 fi
