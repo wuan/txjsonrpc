@@ -1,26 +1,44 @@
-#!/usr/bin/python
-import os
-import unittest
-from doctest import DocFileSuite, ELLIPSIS
-from glob import glob
+#!/usr/bin/env python
+"""
+Pytest-based doctest runner for txjsonrpc-ng documentation.
 
-from txjsonrpc_ng.testing.suite import buildDoctestSuite
+This script runs doctests from documentation files using pytest.
+It can be run directly or via pytest.
+
+Usage:
+    # Run directly
+    python admin/testDocs.py
+
+    # Run via pytest
+    pytest admin/testDocs.py -v
+"""
+import sys
+import pytest
+from pathlib import Path
+
+
+def main():
+    """Run doctests using pytest."""
+    # Get the project root directory (parent of admin/)
+    script_dir = Path(__file__).parent
+    project_root = script_dir.parent
+    
+    # Collect all doctest files
+    doctest_files = list(project_root.glob("docs/specs/*.txt"))
+    doctest_files.append(project_root / "docs/USAGE.txt")
+    
+    # Convert to strings for pytest
+    doctest_paths = [str(f) for f in doctest_files]
+    
+    # Run pytest with doctest options
+    pytest_args = [
+        "--doctest-glob=*.txt",
+        "-v",
+        *doctest_paths
+    ]
+    
+    return pytest.main(pytest_args)
+
 
 if __name__ == '__main__':
-    # To add a new module to the test runner, simply include is in the list below:
-    modules = [
-    ]
-
-    files = glob("docs/specs/*.txt")
-    files.append("docs/USAGE.txt")
-    suites = []
-    for file in files:
-        file = os.path.join("..", file)
-        suites.append(DocFileSuite(file, optionflags=ELLIPSIS))
-    if modules:
-        suites.append(buildDoctestSuite(modules))
-
-
-    if __name__ == "__main__":
-        runner = unittest.TextTestRunner(verbosity=2)
-        runner.run(unittest.TestSuite(suites))
+    sys.exit(main())

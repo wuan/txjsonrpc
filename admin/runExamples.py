@@ -60,12 +60,12 @@ if __name__ == '__main__':
                 expectedResult = preprocess(expectedResult)
                 print("Checking examples/%s against examples/%s ..." % (client, server))
                 # start server
-                command = f"twistd -l {temp_file_name} -noy {os.path.join('examples', server)}"
+                command = f"twistd -l {temp_file_name} -noy {os.path.join('../examples', server)}"
                 server_process = Popen(command, shell=True)
                 pid = server_process.pid
                 sleep(0.5)
                 # run client
-                command = "python %s" % os.path.join("examples", client)
+                command = "python %s" % os.path.join("../examples", client)
                 process = Popen(command, shell=True, stdout=PIPE)
                 (stdout, stderr) = process.communicate()
                 if stderr is not None:
