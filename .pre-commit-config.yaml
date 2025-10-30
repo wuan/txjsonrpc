@@ -1,18 +1,45 @@
 repos:
 - repo: https://github.com/gitleaks/gitleaks
-  rev: v8.16.3
+  rev: v8.22.1
   hooks:
   - id: gitleaks
+
 - repo: https://github.com/jumanjihouse/pre-commit-hooks
   rev: 3.0.0
   hooks:
   - id: shellcheck
+
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.4.0
+  rev: v5.0.0
   hooks:
   - id: end-of-file-fixer
   - id: trailing-whitespace
+  - id: check-yaml
+  - id: check-added-large-files
+  - id: check-merge-conflict
+  - id: mixed-line-ending
+
+- repo: https://github.com/psf/black
+  rev: 24.10.0
+  hooks:
+  - id: black
+    language_version: python3.10
+
+- repo: https://github.com/pycqa/isort
+  rev: 5.13.2
+  hooks:
+  - id: isort
+    args: ["--profile", "black"]
+
+- repo: https://github.com/pre-commit/mirrors-mypy
+  rev: v1.13.0
+  hooks:
+  - id: mypy
+    additional_dependencies: [types-all]
+    args: [--ignore-missing-imports]
+
 - repo: https://github.com/pylint-dev/pylint
-  rev: v2.17.2
+  rev: v3.3.2
   hooks:
   - id: pylint
+    args: [--disable=all, --enable=unused-import]
