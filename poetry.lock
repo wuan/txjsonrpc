@@ -6,7 +6,7 @@ version = "1.1"
 description = "Simple assertion library for unit testing in python with a fluent API"
 optional = false
 python-versions = "*"
-groups = ["main"]
+groups = ["dev"]
 files = [
     {file = "assertpy-1.1.tar.gz", hash = "sha256:acc64329934ad71a3221de185517a43af33e373bb44dc05b5a9b174394ef4833"},
 ]
@@ -727,4 +727,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.9"
-content-hash = "03ebb80bf141260ee97228df81886bdf991bb55f4e6db5d10d798f9a0aac1433"
+content-hash = "a7c327812eeb6a3a9c310135cc42a643912bb172ca945bc6d44d63d753cc6979"
