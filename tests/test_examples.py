@@ -41,6 +41,7 @@ Shutting down reactor...
 """
 
 
+
 @pytest.mark.parametrize("client,server,expected_result", (
         ("tcp/client.py", "tcp/server.tac", "Result: 8"),
         ("tcp/client_subhandled.py", "tcp/server_subhandled.tac", result_subhandled),
@@ -48,18 +49,19 @@ Shutting down reactor...
         ("webAuth/client.py", "webAuth/server.tac", result_web_auth),
 ))
 def test_example(client, server, expected_result):
+    examples_path = os.path.join(os.path.dirname(__file__), '../examples')
     with tempfile.NamedTemporaryFile(delete=True) as temp_file:
         temp_file_name = temp_file.name
 
         expected_result = preprocess(expected_result)
         print("Checking examples/%s against examples/%s ..." % (client, server))
         # start server
-        command = f"twistd -l {temp_file_name} -noy {os.path.join('../examples', server)}"
+        command = f"twistd -l {temp_file_name} -noy {os.path.join(examples_path, server)}"
         server_process = Popen(command, shell=True)
         pid = server_process.pid
         sleep(0.5)
         # run client
-        command = "python %s" % os.path.join("../examples", client)
+        command = "python %s" % os.path.join(examples_path, client)
         process = Popen(command, shell=True, stdout=PIPE)
         (stdout, stderr) = process.communicate()
         if stderr is not None:

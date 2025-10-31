@@ -1,7 +1,7 @@
 import os
 import sys
 
-import jsonrpclib
+from txjsonrpc_ng import jsonrpclib
 
 sys.path.insert(0, os.getcwd())
 

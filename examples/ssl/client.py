@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import logging
 from twisted.internet import reactor, ssl
 from txjsonrpc_ng.web.jsonrpc import Proxy
