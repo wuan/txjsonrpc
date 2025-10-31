@@ -74,8 +74,6 @@ def test_example(client, server, expected_result, tmpdir):
     print("client finished")
 
     # kill server
-    os.kill(pid, signal.SIGTERM)
-    print("server killed (pid=%d)" % pid)
     with open(pid_file_name, 'r') as pid_file:
         pid = int(pid_file.read())
         os.kill(pid, signal.SIGTERM)
