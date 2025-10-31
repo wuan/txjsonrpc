@@ -115,6 +115,13 @@ poetry run pytest tests/web/
 - Import types from `typing` module
 - Run `mypy` for type checking
 
+### Test Cases
+- Use `assertPy` for assertions
+- Use `pytest` for testing
+  - Use fixtures for common test setup/teardown
+- Use `pytest-twisted` for Twisted integration
+- Use `mock` for mocking
+
 ### Twisted Conventions
 - Use `defer.Deferred` for async operations
 - Follow Twisted's naming conventions (e.g., `jsonrpc_methodName` for RPC methods)
