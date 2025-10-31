@@ -54,12 +54,15 @@ class TestDump:
 
 class TestLoads:
 
-    def test_loads(self):
-        jsonInput = ["1", '"a"', '{"apple": 2}', '[1, 2, "a", "b"]']
-        expectedResults = [1, "a", {"apple": 2}, [1, 2, "a", "b"]]
-        for input, expected in zip(jsonInput, expectedResults):
-            unmarshalled = loads(input)
-            assert unmarshalled == expected
+    @pytest.mark.parametrize("input,expected", (
+            ("1", 1),
+            ("\"a\"", "a"),
+            ('{"apple": 2}', {"apple": 2}),
+            ('[1, 2, "a", "b"]', [1, 2, "a", "b"]),
+    ))
+    def test_loads(self, input, expected):
+        unmarshalled = loads(input)
+        assert unmarshalled == expected
 
     @pytest.mark.parametrize("version", [VERSION_PRE1, VERSION_1, VERSION_2])
     def test_loads_fault(self, version):

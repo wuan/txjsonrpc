@@ -1,19 +1,65 @@
-.bzrignore
-.bzr
-*.py[oc]
-dist
-sdist
-build
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
 *.egg
-*.egg-info
-nohup.out
-*.sw[po]
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
 .venv-*
 .tx*-venv
-.idea
-=======
+env/
+ENV/
+
+# Testing
+.tox/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+reports/
+_trial_temp/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sw[po]
+
+# Legacy VCS
+.bzrignore
+.bzr
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+nohup.out
 debian/files
 debian/*.log
 debian/*.substvars
 debian/python-txjsonrpc
-_trial_temp

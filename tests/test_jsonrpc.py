@@ -1,98 +1,95 @@
-from twisted.trial.unittest import TestCase
+import pytest
+from pytest_twisted import inlineCallbacks
 
 from txjsonrpc_ng.jsonrpc import BaseProxy, BaseQueryFactory
 from txjsonrpc_ng.jsonrpclib import Fault, VERSION_PRE1, VERSION_1, VERSION_2
 
 
-class BaseQueryFactoryTestCase(TestCase):
+class TestBaseQueryFactory:
 
     def test_creation(self):
         factory = BaseQueryFactory("someMethod")
-        self.assertTrue(factory.payload is not None)
-        self.assertTrue(factory.deferred is not None)
+        assert factory.payload is not None
+        assert factory.deferred is not None
 
     def test_buildVersionedPayloadPre1(self):
-        factory = BaseQueryFactory("someMethod",version=VERSION_PRE1)
+        factory = BaseQueryFactory("someMethod", version=VERSION_PRE1)
         payload = factory._buildVersionedPayload()
-        self.assertEquals(
-            payload, '{"method": "", "params": []}')
+        assert payload == '{"method": "", "params": []}'
 
     def test_buildVersionedPayload1(self):
         factory = BaseQueryFactory("someMethod", version=VERSION_1)
         payload = factory._buildVersionedPayload()
-        self.assertEquals(
-            payload,
-            '{"method": "", "params": [], "id": 1}')
+        assert payload == '{"method": "", "params": [], "id": 1}'
 
     def test_buildVersionedPayload2(self):
         factory = BaseQueryFactory("someMethod", version=VERSION_2)
         payload = factory._buildVersionedPayload()
-        self.assertEquals(
-            payload,
-            '{"jsonrpc": "2.0", "method": "", "params": [], "id": 1}')
+        assert payload == '{"jsonrpc": "2.0", "method": "", "params": [], "id": 1}'
 
+    @inlineCallbacks
     def test_parseResponseNoJSON(self):
-
-        def check_error(error):
-            self.assertEquals(
-                error.value.msg, "Expecting value")
-
         factory = BaseQueryFactory("someMethod")
         d = factory.deferred
         factory.parseResponse("oops")
-        return d.addErrback(check_error)
+        
+        try:
+            yield d
+            pytest.fail("Expected an error to be raised")
+        except Exception as error:
+            assert error.msg == "Expecting value"
 
+    @inlineCallbacks
     def test_parseResponseRandomJSON(self):
-
-        def check_result(result):
-            self.assertEquals(
-                result, {u'something': 1})
-
         factory = BaseQueryFactory("someMethod")
         d = factory.deferred
         factory.parseResponse('{"something": 1}')
-        return d.addCallback(check_result)
+        
+        result = yield d
+        assert result == {"something": 1}
 
+    @inlineCallbacks
     def test_parseResponseFaultData(self):
-
-        def check_error(error):
-            self.assertTrue(isinstance(error.value, Fault))
-            self.assertEquals(error.value.faultCode, 1)
-            self.assertEquals(error.value.faultString, u"oops")
-
         factory = BaseQueryFactory("someMethod")
         d = factory.deferred
         factory.parseResponse(
             '{"fault": "Fault", "faultCode": 1, "faultString": "oops"}')
-        return d.addErrback(check_error)
+        
+        try:
+            yield d
+            pytest.fail("Expected a Fault to be raised")
+        except Fault as error:
+            assert isinstance(error, Fault)
+            assert error.faultCode == 1
+            assert error.faultString == "oops"
 
 
-class BaseProxyTestCase(TestCase):
+class TestBaseProxy:
 
     def test_creation(self):
         proxy = BaseProxy()
-        self.assertEquals(proxy.version, VERSION_PRE1)
-        self.assertEquals(proxy.factoryClass, None)
+        assert proxy.version == VERSION_PRE1
+        assert proxy.factoryClass is None
 
     def test_getVersionDefault(self):
         proxy = BaseProxy()
         version = proxy._getVersion({})
-        self.assertEquals(version, VERSION_PRE1)
+        assert version == VERSION_PRE1
 
     def test_getVersionPre1(self):
         proxy = BaseProxy()
         version = proxy._getVersion({"version": VERSION_PRE1})
-        self.assertEquals(version, VERSION_PRE1)
+        assert version == VERSION_PRE1
 
     def test_getVersion1(self):
         proxy = BaseProxy()
         version = proxy._getVersion({"version": VERSION_1})
-        self.assertEquals(version, VERSION_1)
+        assert version == VERSION_1
 
     def test_getFactoryClassDefault(self):
         proxy = BaseProxy()
         factoryClass = proxy._getFactoryClass({})
-        self.assertEquals(factoryClass, None)
+        assert factoryClass is None
 
     def test_getFactoryClassPassed(self):
 
@@ -101,4 +98,4 @@ class BaseProxyTestCase(TestCase):
 
         proxy = BaseProxy()
         factoryClass = proxy._getFactoryClass({"factoryClass": FakeFactory})
-        self.assertEquals(factoryClass, FakeFactory)
+        assert factoryClass == FakeFactory

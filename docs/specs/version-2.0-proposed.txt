@@ -32,11 +32,11 @@ Request is expressed as a single JSON Object, with the following members:
 The following imported function is not public and not intended for regular use
 as part of the API. Its use here is for spec-compliance demonstration only::
 
-    >>> from txjsonrpc.jsonrpclib import ServerProxy, VERSION_2
+    >>> from txjsonrpc_ng.jsonrpclib import ServerProxy, VERSION_2
     >>>
     >>> proxy = ServerProxy("http://some.url", version=VERSION_2)
     >>> proxy._getVersionedRequest("myfunc", ["arg1", "arg2", "arg3"], "anid")
-    '{"params": ["arg1", "arg2", "arg3"], "jsonrpc": "2.0", "method": "myfunc", "id": "anid"}'
+    '{"jsonrpc": "2.0", "method": "myfunc", "params": ["arg1", "arg2", "arg3"], "id": "anid"}'
 
 # XXX add async examples for web, web2, and netstring
 # XXX add named parameter support example for each as well

@@ -1,7 +1,7 @@
 import os
 import sys
 
-import jsonrpclib
+from txjsonrpc_ng import jsonrpclib
 
 sys.path.insert(0, os.getcwd())
 
@@ -10,16 +10,16 @@ from twisted.internet import reactor
 from txjsonrpc_ng.netstring.jsonrpc import Proxy
 
 
-def printValue(value):
+def print_value(value):
     print("Result: %s" % str(value))
     reactor.stop()
 
 
-def printError(error):
+def print_error(error):
     print('error', error)
     reactor.stop()
 
 
 proxy = Proxy('127.0.0.1', 7080, version=jsonrpclib.VERSION_2)
-proxy.callRemote('add', 3, 5).addCallbacks(printValue, printError)
+proxy.callRemote('add', 3, 5).addCallbacks(print_value, print_error)
 reactor.run()
