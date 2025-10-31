@@ -60,6 +60,7 @@ def test_example(client, server, expected_result):
         server_process = Popen(command, shell=True)
         pid = server_process.pid
         sleep(0.5)
+        print("server started (pid=%d)" % pid)
         # run client
         command = "python %s" % os.path.join(examples_path, client)
         process = Popen(command, shell=True, stdout=PIPE)
@@ -68,6 +69,7 @@ def test_example(client, server, expected_result):
             print("ERR", stderr)
         output = stdout.decode("utf-8")
         result = preprocess(output)
+        print("client finished")
         # kill server
         os.kill(pid, 15)
         # check results
