@@ -59,10 +59,9 @@ def test_example(client, server, expected_result, tmpdir):
     print("Checking examples/%s against examples/%s ..." % (client, server))
     # start server
     command = f"twistd --pidfile {pid_file_name} -l {temp_file_name} -noy {os.path.join(examples_path, server)}"
-    server_process = Popen(command, shell=True)
-    pid = server_process.pid
+    Popen(command, shell=True)
     sleep(0.5)
-    print("server started (pid=%d)" % pid)
+
     # run client
     command = "python %s" % os.path.join(examples_path, client)
     process = Popen(command, shell=True, stdout=PIPE)
@@ -71,21 +70,10 @@ def test_example(client, server, expected_result, tmpdir):
         print("ERR", stderr)
     output = stdout.decode("utf-8")
     result = preprocess(output)
-    print("client finished")
 
     # kill server
     with open(pid_file_name, 'r') as pid_file:
         pid = int(pid_file.read())
         os.kill(pid, signal.SIGTERM)
-        print("server killed (pid=%d)" % pid)
 
-    # check results
-    if result != expected_result:
-        print("ERROR: expected '%s' but got '%s'" % (expected_result, result))
-        print_result(expected_result)
-        print("but got")
-        print_result(result)
-        print("-- log output:")
-        with open(temp_file_name, 'r') as log_file:
-            print(log_file.read())
-        sys.exit(1)
+    assert result == expected_result
