@@ -2,6 +2,7 @@ import os
 import signal
 import sys
 import tempfile
+from pathlib import Path
 from subprocess import Popen, PIPE
 from time import sleep
 from typing import List
@@ -50,7 +51,7 @@ Shutting down reactor...
         ("webAuth/client.py", "webAuth/server.tac", result_web_auth),
 ))
 def test_example(client, server, expected_result, tmpdir):
-    examples_path = os.path.join(os.path.dirname(__file__), '../examples')
+    examples_path = Path(__file__).parent.parent / 'examples'
 
     temp_file_name = tmpdir.join("log.txt")
     pid_file_name = tmpdir.join("pid.txt")
@@ -58,12 +59,12 @@ def test_example(client, server, expected_result, tmpdir):
     expected_result = preprocess(expected_result)
     print("Checking examples/%s against examples/%s ..." % (client, server))
     # start server
-    command = f"twistd --pidfile {pid_file_name} -l {temp_file_name} -noy {os.path.join(examples_path, server)}"
+    command = f"twistd --pidfile {pid_file_name} -l {temp_file_name} -noy { (examples_path / server) }"
     Popen(command, shell=True)
     sleep(0.5)
 
     # run client
-    command = "python %s" % os.path.join(examples_path, client)
+    command = "python %s" % (examples_path / client)
     process = Popen(command, shell=True, stdout=PIPE)
     (stdout, stderr) = process.communicate()
     if stderr is not None:
