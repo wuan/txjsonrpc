@@ -1,14 +1,17 @@
-[tool.poetry]
+[project]
 name = "txjsonrpc-ng"
-version = "0.7.5"
+version = "0.8.0"
 description = "Code for creating Twisted JSON-RPC servers and clients."
-authors = ["Duncan McGreggor <oubiwann@adytum.us>, Andreas Wuerl <andi@tryb.de>"]
-license = "BSD, GPL"
+authors = [
+    {name = "Duncan McGreggor", email = "oubiwann@adytum.us"},
+    {name = "Andreas Würl", email = "andi@tryb.de"}
+]
+license = "MIT"
 readme = "README.rst"
-
-[tool.poetry.dependencies]
-python = "^3.9"
-Twisted = "^24.11"
+requires-python = ">=3.9"
+dependencies = [
+    "twisted>=25.5"
+]
 
 [tool.poetry.group.dev.dependencies]
 assertpy = "^1.1"
