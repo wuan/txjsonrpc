@@ -1,4 +1,3 @@
-from __future__ import print_function
 from twisted.internet import reactor, defer
 
 from txjsonrpc_ng.web.jsonrpc import Proxy

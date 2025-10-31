@@ -3,7 +3,6 @@
 """
 Test JSON-RPC over TCP support.
 """
-from __future__ import print_function
 
 import pytest
 from twisted.internet import reactor, defer
@@ -12,8 +11,7 @@ from twisted.trial import unittest
 from txjsonrpc_ng import jsonrpclib
 from txjsonrpc_ng.jsonrpclib import VERSION_2
 from txjsonrpc_ng.netstring import jsonrpc
-from txjsonrpc_ng.netstring.jsonrpc import (
-    JSONRPC, Proxy, QueryFactory)
+from txjsonrpc_ng.netstring.jsonrpc import ( JSONRPC, Proxy, QueryFactory)
 
 
 class RuntimeErrorTest(RuntimeError):

@@ -31,6 +31,10 @@ from twisted.web import resource, server
 from twisted.internet import defer, reactor
 from twisted.python import log, context
 from twisted.web import http
+from twisted.web.client import Agent, HTTPConnectionPool, readBody
+from twisted.web.http_headers import Headers
+from twisted.web.iweb import IBodyProducer
+from zope.interface import implementer
 
 from txjsonrpc_ng import jsonrpclib
 from txjsonrpc_ng.jsonrpc import BaseProxy, BaseQueryFactory, BaseSubhandler
@@ -217,53 +221,115 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         return True
 
 
-class QueryProtocol(http.HTTPClient):
+@implementer(IBodyProducer)
+class StringProducer:
+    """
+    A simple body producer for sending string data with Agent.
+    """
+    def __init__(self, body):
+        self.body = body.encode('utf-8') if isinstance(body, str) else body
+        self.length = len(self.body)
 
-    def __init__(self):
-        self.response_headers = {}
+    def startProducing(self, consumer):
+        consumer.write(self.body)
+        return defer.succeed(None)
 
-    def connectionMade(self):
-        self.sendCommand(b'POST', self.factory.path.encode())
-        self.sendHeader(b'User-Agent', b'Twisted/JSONRPClib')
-        self.sendHeader(b'Host', self.factory.host.encode())
-        self.sendHeader(b'Content-type', b'application/json')
-        if self.factory.compress:
-            self.sendHeader(b'Accept-encoding', b'gzip')
-        self.sendHeader(b'Content-length', str(len(self.factory.payload)))
-        if self.factory.user:
-            auth = '%s:%s' % (self.factory.user, self.factory.password)
-            auth = codecs.encode(auth.encode(), 'base64')
-            self.sendHeader(b'Authorization', b'Basic ' + auth)
-        self.endHeaders()
-        self.transport.write(self.factory.payload.encode())
+    def pauseProducing(self):
+        pass
 
-    def handleStatus(self, version, status, message):
-        status = status.decode()
-        if status != '200':
-            self.factory.badStatus(status, message.decode())
-
-    def handleHeader(self, key, val):
-        self.response_headers[key.decode().lower()] = val.decode()
-
-    def handleResponse(self, contents):
-        if self.response_headers.get("content-encoding") == "gzip":
-            compressed_file = io.BytesIO(contents)
-            with gzip.GzipFile(mode='rb', fileobj=compressed_file) as in_file:
-                contents = in_file.read()
-            compressed_file.close()
-        self.factory.parseResponse(contents.decode())
+    def stopProducing(self):
+        pass
 
 
 class QueryFactory(BaseQueryFactory):
+    """
+    Factory for making JSON-RPC requests using twisted.web.client.Agent.
+    """
     deferred = None
-    protocol = QueryProtocol
 
     def __init__(self, path, host, method, user=None, password=None,
-                 version=jsonrpclib.VERSION_PRE1, compress=False, *args):
+                 version=jsonrpclib.VERSION_PRE1, compress=False, *args, 
+                 agent=None, url=None):
         BaseQueryFactory.__init__(self, method, version, *args)
         self.path, self.host = path, host
         self.user, self.password = user, password
         self.compress = compress
+        self.agent = agent
+        self.url = url
+
+    def _makeRequest(self):
+        """
+        Make the HTTP request using Agent.
+        """
+        # Build headers
+        headers_dict = {
+            b'User-Agent': [b'Twisted/JSONRPClib'],
+            b'Host': [self.host.encode('utf-8')],
+            b'Content-Type': [b'application/json'],
+        }
+        
+        if self.compress:
+            headers_dict[b'Accept-Encoding'] = [b'gzip']
+        
+        if self.user:
+            auth = '%s:%s' % (self.user, self.password)
+            auth = codecs.encode(auth.encode(), 'base64').strip()
+            headers_dict[b'Authorization'] = [b'Basic ' + auth]
+        
+        headers = Headers(headers_dict)
+        
+        # Create body producer
+        body_producer = StringProducer(self.payload)
+        
+        # Make request
+        d = self.agent.request(
+            b'POST',
+            self.url.encode('utf-8'),
+            headers,
+            body_producer
+        )
+        
+        # Add callbacks
+        d.addCallback(self._handleResponse)
+        d.addErrback(self._handleError)
+        return d
+
+    def _handleResponse(self, response):
+        """
+        Handle the HTTP response.
+        """
+        if response.code != 200:
+            self.badStatus(str(response.code), response.phrase.decode('utf-8'))
+            return response
+        
+        # Read the response body
+        d = readBody(response)
+        d.addCallback(self._processBody, response)
+        d.addErrback(self._handleError)
+        return d
+
+    def _processBody(self, body, response):
+        """
+        Process the response body, handling gzip compression if needed.
+        """
+        # Check for gzip compression
+        content_encoding = response.headers.getRawHeaders(b'content-encoding')
+        if content_encoding and b'gzip' in [enc.lower() for enc in content_encoding]:
+            compressed_file = io.BytesIO(body)
+            with gzip.GzipFile(mode='rb', fileobj=compressed_file) as in_file:
+                body = in_file.read()
+            compressed_file.close()
+        
+        # Parse the response
+        self.parseResponse(body.decode('utf-8'))
+
+    def _handleError(self, failure):
+        """
+        Handle errors during the request.
+        """
+        if self.deferred is not None:
+            self.deferred.errback(failure)
+            self.deferred = None
 
 
 class Proxy(BaseProxy):
@@ -277,7 +343,8 @@ class Proxy(BaseProxy):
     """
 
     def __init__(self, url, user=None, password=None,
-                 version=jsonrpclib.VERSION_PRE1, compress=False, factoryClass=QueryFactory, ssl_ctx_factory=None):
+                 version=jsonrpclib.VERSION_PRE1, compress=False, factoryClass=QueryFactory, 
+                 ssl_ctx_factory=None, pool=None):
         """
         @type url: C{str}
         @param url: The URL to which to post method calls.  Calls will be made
@@ -306,8 +373,14 @@ class Proxy(BaseProxy):
         @type ssl_ctx_factory: C{twisted.internet.ssl.ClientContextFactory} or None
         @param ssl_ctx_factory: SSL client context factory class to use instead
         of default twisted.internet.ssl.ClientContextFactory.
+        
+        @type pool: C{twisted.web.client.HTTPConnectionPool} or None
+        @param pool: Connection pool to use for the Agent. If None, a new pool
+        will be created.
         """
         BaseProxy.__init__(self, version, factoryClass)
+        
+        # Parse URL
         scheme, netloc, path, params, query, fragment = urlparse.urlparse(url)
         netlocParts = netloc.split('@')
         if len(netlocParts) == 2:
@@ -335,21 +408,36 @@ class Proxy(BaseProxy):
             self.password = password
         self.compress = compress
         self.ssl_ctx_factory = ssl_ctx_factory
+        
+        # Construct clean URL without auth info for Agent
+        clean_netloc = netlocParts[0]  # This is already without auth
+        if self.port:
+            clean_url = '%s://%s:%d%s' % (scheme, self.host, self.port, self.path)
+        else:
+            clean_url = '%s://%s%s' % (scheme, self.host, self.path)
+        self.url = clean_url
+        
+        # Create Agent
+        if pool is None:
+            pool = HTTPConnectionPool(reactor)
+        
+        if self.secure:
+            from twisted.internet import ssl
+            if self.ssl_ctx_factory is None:
+                self.ssl_ctx_factory = ssl.ClientContextFactory
+            # For HTTPS, we need to pass the context factory
+            self.agent = Agent(reactor, self.ssl_ctx_factory(), pool=pool)
+        else:
+            self.agent = Agent(reactor, pool=pool)
 
     def callRemote(self, method, *args, **kwargs):
         version = self._getVersion(kwargs)
         # XXX generate unique id and pass it as a parameter
         factoryClass = self._getFactoryClass(kwargs)
         factory = factoryClass(self.path, self.host, method, self.user,
-                               self.password, version, self.compress, *args)
-        if self.secure:
-            from twisted.internet import ssl
-            if self.ssl_ctx_factory is None:
-                self.ssl_ctx_factory = ssl.ClientContextFactory
-            reactor.connectSSL(self.host, self.port or 443,
-                               factory, self.ssl_ctx_factory())
-        else:
-            reactor.connectTCP(self.host, self.port or 80, factory)
+                               self.password, version, self.compress, *args,
+                               agent=self.agent, url=self.url)
+        factory._makeRequest()
         return factory.deferred
 
 
