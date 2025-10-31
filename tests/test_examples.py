@@ -72,10 +72,15 @@ def test_example(client, server, expected_result, tmpdir):
     output = stdout.decode("utf-8")
     result = preprocess(output)
     print("client finished")
+
     # kill server
     os.kill(pid, signal.SIGTERM)
-    sleep(0.5)
-    os.kill(pid, signal.SIGKILL)
+    print("server killed (pid=%d)" % pid)
+    with open(pid_file_name, 'r') as pid_file:
+        pid = int(pid_file.read())
+        os.kill(pid, signal.SIGTERM)
+        print("server killed (pid=%d)" % pid)
+
     # check results
     if result != expected_result:
         print("ERROR: expected '%s' but got '%s'" % (expected_result, result))
