@@ -71,8 +71,8 @@ def test_example(client, server, expected_result, tmpdir):
 
     result = None
     try:
-        # run client
-        client_cmd = ["python", str(examples_path / client)]
+        # run client - use sys.executable to ensure we're in the same Python environment
+        client_cmd = [sys.executable, str(examples_path / client)]
         process = Popen(client_cmd, stdout=PIPE)
         (stdout, stderr) = process.communicate()
         if stderr is not None:
