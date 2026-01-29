@@ -58,17 +58,22 @@ def test_example(client, server, expected_result, tmpdir):
 
     expected_result = preprocess(expected_result)
     print("Checking examples/%s against examples/%s ..." % (client, server))
-    # start server - use double quotes for Windows compatibility
-    command = f"twistd --pidfile \"{pid_file_name}\" -l \"{temp_file_name}\" -noy \"{examples_path / server}\""
-    print(f"Starting server with command: {command}")
-    server_process = Popen(command, shell=True, stdout=PIPE, stderr=PIPE)
+    # start server - use list form to avoid shell quoting issues
+    server_cmd = [
+        "twistd",
+        "--pidfile", str(pid_file_name),
+        "-l", str(temp_file_name),
+        "-noy", str(examples_path / server)
+    ]
+    print(f"Starting server with command: {' '.join(server_cmd)}")
+    server_process = Popen(server_cmd, stdout=PIPE, stderr=PIPE)
     sleep(0.5)
 
     result = None
     try:
         # run client
-        command = f"python \"{examples_path / client}\""
-        process = Popen(command, shell=True, stdout=PIPE)
+        client_cmd = ["python", str(examples_path / client)]
+        process = Popen(client_cmd, stdout=PIPE)
         (stdout, stderr) = process.communicate()
         if stderr is not None:
             print("ERR", stderr)
