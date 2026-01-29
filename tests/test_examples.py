@@ -58,23 +58,45 @@ def test_example(client, server, expected_result, tmpdir):
 
     expected_result = preprocess(expected_result)
     print("Checking examples/%s against examples/%s ..." % (client, server))
-    # start server
-    command = f"twistd --pidfile {pid_file_name} -l {temp_file_name} -noy { (examples_path / server) }"
-    Popen(command, shell=True)
+    # start server - use list form to avoid shell quoting issues
+    server_cmd = [
+        "twistd",
+        "--pidfile", str(pid_file_name),
+        "-l", str(temp_file_name),
+        "-noy", str(examples_path / server)
+    ]
+    print(f"Starting server with command: {' '.join(server_cmd)}")
+    server_process = Popen(server_cmd, stdout=PIPE, stderr=PIPE)
     sleep(0.5)
 
-    # run client
-    command = "python %s" % (examples_path / client)
-    process = Popen(command, shell=True, stdout=PIPE)
-    (stdout, stderr) = process.communicate()
-    if stderr is not None:
-        print("ERR", stderr)
-    output = stdout.decode("utf-8")
-    result = preprocess(output)
-
-    # kill server
-    with open(pid_file_name, 'r') as pid_file:
-        pid = int(pid_file.read())
-        os.kill(pid, signal.SIGTERM)
+    result = None
+    try:
+        # run client - use sys.executable to ensure we're in the same Python environment
+        client_cmd = [sys.executable, str(examples_path / client)]
+        process = Popen(client_cmd, stdout=PIPE)
+        (stdout, stderr) = process.communicate()
+        if stderr is not None:
+            print("ERR", stderr)
+        output = stdout.decode("utf-8")
+        result = preprocess(output)
+    finally:
+        # kill server
+        try:
+            with open(pid_file_name, 'r') as pid_file:
+                pid = int(pid_file.read())
+                os.kill(pid, signal.SIGTERM)
+        except FileNotFoundError:
+            # If pid file doesn't exist, try to kill the shell process
+            # and capture any server errors
+            if server_process.poll() is None:
+                server_process.terminate()
+                server_process.wait(timeout=5)
+            else:
+                # Server already exited, check for errors
+                stdout, stderr = server_process.communicate()
+                if stderr:
+                    print(f"Server stderr: {stderr.decode('utf-8')}")
+                if stdout:
+                    print(f"Server stdout: {stdout.decode('utf-8')}")
 
     assert result == expected_result
