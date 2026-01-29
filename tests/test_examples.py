@@ -58,15 +58,16 @@ def test_example(client, server, expected_result, tmpdir):
 
     expected_result = preprocess(expected_result)
     print("Checking examples/%s against examples/%s ..." % (client, server))
-    # start server
-    command = f'twistd --pidfile "{pid_file_name}" -l "{temp_file_name}" -noy "{examples_path / server}"'
-    server_process = Popen(command, shell=True)
+    # start server - use double quotes for Windows compatibility
+    command = f"twistd --pidfile \"{pid_file_name}\" -l \"{temp_file_name}\" -noy \"{examples_path / server}\""
+    print(f"Starting server with command: {command}")
+    server_process = Popen(command, shell=True, stdout=PIPE, stderr=PIPE)
     sleep(0.5)
 
     result = None
     try:
         # run client
-        command = f'python "{examples_path / client}"'
+        command = f"python \"{examples_path / client}\""
         process = Popen(command, shell=True, stdout=PIPE)
         (stdout, stderr) = process.communicate()
         if stderr is not None:
@@ -81,8 +82,16 @@ def test_example(client, server, expected_result, tmpdir):
                 os.kill(pid, signal.SIGTERM)
         except FileNotFoundError:
             # If pid file doesn't exist, try to kill the shell process
+            # and capture any server errors
             if server_process.poll() is None:
                 server_process.terminate()
                 server_process.wait(timeout=5)
+            else:
+                # Server already exited, check for errors
+                stdout, stderr = server_process.communicate()
+                if stderr:
+                    print(f"Server stderr: {stderr.decode('utf-8')}")
+                if stdout:
+                    print(f"Server stdout: {stdout.decode('utf-8')}")
 
     assert result == expected_result
