@@ -14,6 +14,9 @@ Maintainer: U{Duncan McGreggor<mailto:oubiwann@adytum.us>}
 import codecs
 import io
 
+from twisted.web.client import Agent
+from twisted.web.http_headers import Headers
+
 from .render import renderer_factory
 
 try:
@@ -247,15 +250,13 @@ class QueryFactory(BaseQueryFactory):
     """
     deferred = None
 
-    def __init__(self, path, host, method, user=None, password=None,
-                 version=jsonrpclib.VERSION_PRE1, compress=False, *args, 
-                 agent=None, url=None):
+    def __init__(self, agent, url, method, username, password, version=jsonrpclib.VERSION_PRE1, compress=False, *args):
         BaseQueryFactory.__init__(self, method, version, *args)
-        self.path, self.host = path, host
-        self.user, self.password = user, password
-        self.compress = compress
         self.agent = agent
         self.url = url
+        self.username = username
+        self.password = password
+        self.compress = compress
 
     def _makeRequest(self):
         """
@@ -264,23 +265,23 @@ class QueryFactory(BaseQueryFactory):
         # Build headers
         headers_dict = {
             b'User-Agent': [b'Twisted/JSONRPClib'],
-            b'Host': [self.host.encode('utf-8')],
+            # b'Host': [self.host.encode('utf-8')],
             b'Content-Type': [b'application/json'],
         }
-        
+
         if self.compress:
             headers_dict[b'Accept-Encoding'] = [b'gzip']
-        
-        if self.user:
-            auth = '%s:%s' % (self.user, self.password)
+
+        if self.username:
+            auth = '%s:%s' % (self.username, self.password)
             auth = codecs.encode(auth.encode(), 'base64').strip()
             headers_dict[b'Authorization'] = [b'Basic ' + auth]
-        
+
         headers = Headers(headers_dict)
-        
+
         # Create body producer
         body_producer = StringProducer(self.payload)
-        
+
         # Make request
         d = self.agent.request(
             b'POST',
@@ -288,7 +289,7 @@ class QueryFactory(BaseQueryFactory):
             headers,
             body_producer
         )
-        
+
         # Add callbacks
         d.addCallback(self._handleResponse)
         d.addErrback(self._handleError)
@@ -301,7 +302,7 @@ class QueryFactory(BaseQueryFactory):
         if response.code != 200:
             self.badStatus(str(response.code), response.phrase.decode('utf-8'))
             return response
-        
+
         # Read the response body
         d = readBody(response)
         d.addCallback(self._processBody, response)
@@ -319,7 +320,7 @@ class QueryFactory(BaseQueryFactory):
             with gzip.GzipFile(mode='rb', fileobj=compressed_file) as in_file:
                 body = in_file.read()
             compressed_file.close()
-        
+
         # Parse the response
         self.parseResponse(body.decode('utf-8'))
 
@@ -342,8 +343,8 @@ class Proxy(BaseProxy):
     'foobar' with *args.
     """
 
-    def __init__(self, url, user=None, password=None,
-                 version=jsonrpclib.VERSION_PRE1, compress=False, factoryClass=QueryFactory, 
+    def __init__(self, url, username=None, password=None,
+                 version=jsonrpclib.VERSION_PRE1, compress=False, factoryClass=QueryFactory,
                  ssl_ctx_factory=None, pool=None):
         """
         @type url: C{str}
@@ -373,54 +374,48 @@ class Proxy(BaseProxy):
         @type ssl_ctx_factory: C{twisted.internet.ssl.ClientContextFactory} or None
         @param ssl_ctx_factory: SSL client context factory class to use instead
         of default twisted.internet.ssl.ClientContextFactory.
-        
+
         @type pool: C{twisted.web.client.HTTPConnectionPool} or None
         @param pool: Connection pool to use for the Agent. If None, a new pool
         will be created.
         """
         BaseProxy.__init__(self, version, factoryClass)
-        
+
         # Parse URL
         scheme, netloc, path, params, query, fragment = urlparse.urlparse(url)
         netlocParts = netloc.split('@')
         if len(netlocParts) == 2:
             userpass = netlocParts.pop(0).split(':')
-            self.user = userpass.pop(0)
+            self.username = userpass.pop(0)
             try:
                 self.password = userpass.pop(0)
             except:
                 self.password = None
         else:
-            self.user = self.password = None
-        hostport = netlocParts[0].split(':')
-        self.host = hostport.pop(0)
-        try:
-            self.port = int(hostport.pop(0))
-        except:
-            self.port = None
-        self.path = path
-        if self.path in ['', None]:
-            self.path = '/'
-        self.secure = (scheme == 'https')
-        if user is not None:
-            self.user = user
-        if password is not None:
+            self.username = self.password = None
+        if username:
+            self.username = username
+        if password:
             self.password = password
+        hostport = netlocParts[0].split(':')
+        host = hostport.pop(0)
+        try:
+            port = int(hostport.pop(0))
+        except:
+            port = None
+        self.secure = (scheme == 'https')
         self.compress = compress
         self.ssl_ctx_factory = ssl_ctx_factory
-        
-        # Construct clean URL without auth info for Agent
-        clean_netloc = netlocParts[0]  # This is already without auth
-        if self.port:
-            clean_url = '%s://%s:%d%s' % (scheme, self.host, self.port, self.path)
+        if port:
+            clean_url = '%s://%s:%d%s' % (scheme, host, port, path)
         else:
-            clean_url = '%s://%s%s' % (scheme, self.host, self.path)
+            clean_url = '%s://%s%s' % (scheme, host, path)
         self.url = clean_url
-        
+
         # Create Agent
         if pool is None:
             pool = HTTPConnectionPool(reactor)
-        
+
         if self.secure:
             from twisted.internet import ssl
             if self.ssl_ctx_factory is None:
@@ -434,9 +429,7 @@ class Proxy(BaseProxy):
         version = self._getVersion(kwargs)
         # XXX generate unique id and pass it as a parameter
         factoryClass = self._getFactoryClass(kwargs)
-        factory = factoryClass(self.path, self.host, method, self.user,
-                               self.password, version, self.compress, *args,
-                               agent=self.agent, url=self.url)
+        factory = factoryClass(self.agent, self.url, method, self.username, self.password, version, self.compress, *args)
         factory._makeRequest()
         return factory.deferred
 
