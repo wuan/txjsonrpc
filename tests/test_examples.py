@@ -59,12 +59,20 @@ def test_example(client, server, expected_result, tmpdir):
     expected_result = preprocess(expected_result)
     print("Checking examples/%s against examples/%s ..." % (client, server))
     # start server - use list form to avoid shell quoting issues
-    server_cmd = [
-        "twistd",
-        "--pidfile", str(pid_file_name),
-        "-l", str(temp_file_name),
-        "-noy", str(examples_path / server)
-    ]
+    # On Windows, twistd 25.5+ doesn't support --pidfile as a global option
+    if sys.platform == "win32":
+        server_cmd = [
+            "twistd",
+            "-l", str(temp_file_name),
+            "-noy", str(examples_path / server)
+        ]
+    else:
+        server_cmd = [
+            "twistd",
+            "--pidfile", str(pid_file_name),
+            "-l", str(temp_file_name),
+            "-noy", str(examples_path / server)
+        ]
     print(f"Starting server with command: {' '.join(server_cmd)}")
     server_process = Popen(server_cmd, stdout=PIPE, stderr=PIPE)
     sleep(0.5)
@@ -81,13 +89,8 @@ def test_example(client, server, expected_result, tmpdir):
         result = preprocess(output)
     finally:
         # kill server
-        try:
-            with open(pid_file_name, 'r') as pid_file:
-                pid = int(pid_file.read())
-                os.kill(pid, signal.SIGTERM)
-        except FileNotFoundError:
-            # If pid file doesn't exist, try to kill the shell process
-            # and capture any server errors
+        # On Windows, we don't use pidfile, so kill the process directly
+        if sys.platform == "win32":
             if server_process.poll() is None:
                 server_process.terminate()
                 server_process.wait(timeout=5)
@@ -98,5 +101,23 @@ def test_example(client, server, expected_result, tmpdir):
                     print(f"Server stderr: {stderr.decode('utf-8')}")
                 if stdout:
                     print(f"Server stdout: {stdout.decode('utf-8')}")
+        else:
+            try:
+                with open(pid_file_name, 'r') as pid_file:
+                    pid = int(pid_file.read())
+                    os.kill(pid, signal.SIGTERM)
+            except FileNotFoundError:
+                # If pid file doesn't exist, try to kill the shell process
+                # and capture any server errors
+                if server_process.poll() is None:
+                    server_process.terminate()
+                    server_process.wait(timeout=5)
+                else:
+                    # Server already exited, check for errors
+                    stdout, stderr = server_process.communicate()
+                    if stderr:
+                        print(f"Server stderr: {stderr.decode('utf-8')}")
+                    if stdout:
+                        print(f"Server stdout: {stdout.decode('utf-8')}")
 
     assert result == expected_result
