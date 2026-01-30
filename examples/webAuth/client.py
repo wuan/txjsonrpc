@@ -8,10 +8,11 @@ def printValue(value):
 
 
 def printError(error):
-    status, message = error.value.args
-    if status == "401":
-        print(message)
-        return
+    if hasattr(error.value, 'args') and len(error.value.args) >= 2:
+        status, message = error.value.args[0], error.value.args[1]
+        if status == "401":
+            print(message)
+            return
     print('error', error)
 
 
