@@ -89,8 +89,19 @@ def test_example(client, server, expected_result, tmpdir):
         result = preprocess(output)
     finally:
         # kill server
-        # On Windows, we don't use pidfile, so kill the process directly
-        if sys.platform == "win32":
+        # On non-Windows, try to use pidfile first
+        killed = False
+        if sys.platform != "win32":
+            try:
+                with open(pid_file_name, 'r') as pid_file:
+                    pid = int(pid_file.read())
+                    os.kill(pid, signal.SIGTERM)
+                    killed = True
+            except FileNotFoundError:
+                pass
+        
+        # If pidfile approach didn't work (or on Windows), kill process directly
+        if not killed:
             if server_process.poll() is None:
                 server_process.terminate()
                 server_process.wait(timeout=5)
@@ -101,23 +112,5 @@ def test_example(client, server, expected_result, tmpdir):
                     print(f"Server stderr: {stderr.decode('utf-8')}")
                 if stdout:
                     print(f"Server stdout: {stdout.decode('utf-8')}")
-        else:
-            try:
-                with open(pid_file_name, 'r') as pid_file:
-                    pid = int(pid_file.read())
-                    os.kill(pid, signal.SIGTERM)
-            except FileNotFoundError:
-                # If pid file doesn't exist, try to kill the shell process
-                # and capture any server errors
-                if server_process.poll() is None:
-                    server_process.terminate()
-                    server_process.wait(timeout=5)
-                else:
-                    # Server already exited, check for errors
-                    stdout, stderr = server_process.communicate()
-                    if stderr:
-                        print(f"Server stderr: {stderr.decode('utf-8')}")
-                    if stdout:
-                        print(f"Server stdout: {stdout.decode('utf-8')}")
 
     assert result == expected_result
