@@ -59,12 +59,20 @@ def test_example(client, server, expected_result, tmpdir):
     expected_result = preprocess(expected_result)
     print("Checking examples/%s against examples/%s ..." % (client, server))
     # start server - use list form to avoid shell quoting issues
-    server_cmd = [
-        "twistd",
-        "--pidfile", str(pid_file_name),
-        "-l", str(temp_file_name),
-        "-noy", str(examples_path / server)
-    ]
+    # On Windows, twistd 25.5+ doesn't support --pidfile as a global option
+    if sys.platform == "win32":
+        server_cmd = [
+            "twistd",
+            "-l", str(temp_file_name),
+            "-noy", str(examples_path / server)
+        ]
+    else:
+        server_cmd = [
+            "twistd",
+            "--pidfile", str(pid_file_name),
+            "-l", str(temp_file_name),
+            "-noy", str(examples_path / server)
+        ]
     print(f"Starting server with command: {' '.join(server_cmd)}")
     server_process = Popen(server_cmd, stdout=PIPE, stderr=PIPE)
     sleep(0.5)
@@ -81,13 +89,19 @@ def test_example(client, server, expected_result, tmpdir):
         result = preprocess(output)
     finally:
         # kill server
-        try:
-            with open(pid_file_name, 'r') as pid_file:
-                pid = int(pid_file.read())
-                os.kill(pid, signal.SIGTERM)
-        except FileNotFoundError:
-            # If pid file doesn't exist, try to kill the shell process
-            # and capture any server errors
+        # On non-Windows, try to use pidfile first
+        killed = False
+        if sys.platform != "win32":
+            try:
+                with open(pid_file_name, 'r') as pid_file:
+                    pid = int(pid_file.read())
+                    os.kill(pid, signal.SIGTERM)
+                    killed = True
+            except FileNotFoundError:
+                pass
+        
+        # If pidfile approach didn't work (or on Windows), kill process directly
+        if not killed:
             if server_process.poll() is None:
                 server_process.terminate()
                 server_process.wait(timeout=5)
