@@ -1,6 +1,6 @@
 [project]
 name = "txjsonrpc-ng"
-version = "0.8.0"
+version = "0.8.1"
 description = "Code for creating Twisted JSON-RPC servers and clients."
 authors = [
     {name = "Duncan McGreggor", email = "oubiwann@adytum.us"},
