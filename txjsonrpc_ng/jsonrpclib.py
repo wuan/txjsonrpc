@@ -9,6 +9,7 @@ except ImportError:
     import xmlrpc.client as xmlrpclib
 
 from datetime import datetime
+from xmlrpc.client import Fault as Fault
 
 import json
 
@@ -30,8 +31,6 @@ METHOD_NOT_CALLABLE = -32604
 VERSION_PRE1 = 0
 VERSION_1 = 1
 VERSION_2 = 2
-
-Fault = xmlrpclib.Fault
 
 
 class NoSuchFunction(Fault):

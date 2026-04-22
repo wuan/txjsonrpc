@@ -92,7 +92,7 @@ class QueryProtocol(basic.NetstringReceiver):
 
 class QueryFactory(BaseQueryFactory):
 
-    protocol = QueryProtocol
+    protocol = QueryProtocol  # type: ignore[assignment]
     data = ''
 
     def clientConnectionLost(self, _, reason):

@@ -48,6 +48,9 @@ jobs:
       - name: Show environment
         run: poetry run pip list
 
+      - name: Type Check
+        run: poetry run mypy txjsonrpc_ng/
+
       - name: Tests
         run: |
           poetry run pytest --doctest-glob="docs/specs/*.txt" --cov txjsonrpc_ng --cov-report xml:reports/coverage.xml --cov-report term --junitxml=reports/junit.xml
