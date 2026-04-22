@@ -5,6 +5,7 @@ Test JSON-RPC support.
 """
 import gzip
 import io
+from unittest.mock import MagicMock
 
 import pytest
 from twisted.internet import reactor, defer
@@ -351,3 +352,99 @@ class ProxyErrorHandlingTestCase:
             "http://127.0.0.1:%d/" % (site_port,))
         return self.assertFailure(
             await proxy.callRemote("someMethod"), Exception)
+
+
+class TestRenderer:
+    """Test render.py classes."""
+
+    def test_default_renderer_basic(self):
+        """Test DefaultRenderer basic rendering."""
+        from txjsonrpc_ng.web.render import DefaultRenderer
+        from unittest.mock import MagicMock
+
+        # Create mock request
+        request = MagicMock()
+        request.getHeader.return_value = None
+        request.setHeader = MagicMock()
+        request.write = MagicMock()
+
+        renderer = DefaultRenderer("test_result", "id1", 1, request)
+        assert renderer.id == "id1"
+        assert renderer.version == 1
+
+        # Mock string_renderer
+        def string_renderer(result, id, version):
+            return f"result:{result},id:{id},v:{version}"
+
+        renderer.render(string_renderer)
+        request.write.assert_called_once()
+
+    def test_cacheable_result_renderer_with_cached_value(self):
+        """Test CacheableResultRenderer with cached compressed value."""
+        from txjsonrpc_ng.web.render import CacheableResultRenderer
+
+        # Create mock request
+        request = MagicMock()
+        request.getHeader.return_value = None
+        request.setHeader = MagicMock()
+        request.write = MagicMock()
+
+        # Create CacheableResult with cached values
+        cache_result = CacheableResult("test_value")
+        cache_result.string_value = "cached_string"
+        cache_result.compressed_value = b"cached_compressed"
+
+        renderer = CacheableResultRenderer(cache_result, "id1", 1, request)
+
+        def string_renderer(result, id, version):
+            return f"result:{result}"
+
+        renderer.render(string_renderer)
+        request.write.assert_called_once()
+
+    def test_cacheable_result_renderer_without_cached_value(self):
+        """Test CacheableResultRenderer without cached values."""
+        from txjsonrpc_ng.web.render import CacheableResultRenderer
+
+        # Create mock request
+        request = MagicMock()
+        request.getHeader.return_value = None
+        request.setHeader = MagicMock()
+        request.write = MagicMock()
+
+        # Create CacheableResult without cached values
+        cache_result = CacheableResult("test_value")
+        assert cache_result.string_value is None
+        assert cache_result.compressed_value is None
+
+        renderer = CacheableResultRenderer(cache_result, "id1", 1, request)
+
+        def string_renderer(result, id, version):
+            return "rendered_result_string"
+
+        renderer.render(string_renderer)
+
+        # Should have called string_renderer and stored result
+        assert cache_result.string_value == "rendered_result_string"
+        request.write.assert_called_once()
+
+    def test_renderer_factory_cacheable(self):
+        """Test renderer_factory returns CacheableResultRenderer for CacheableResult."""
+        from txjsonrpc_ng.web.render import renderer_factory, CacheableResultRenderer
+
+        request = MagicMock()
+        request.getHeader.return_value = None
+
+        cache_result = CacheableResult("test")
+        renderer = renderer_factory(cache_result, "id1", 1, request)
+        assert isinstance(renderer, CacheableResultRenderer)
+
+    def test_renderer_factory_default(self):
+        """Test renderer_factory returns DefaultRenderer for regular result."""
+        from txjsonrpc_ng.web.render import renderer_factory, DefaultRenderer
+
+        request = MagicMock()
+        request.getHeader.return_value = None
+
+        renderer = renderer_factory("regular_result", "id1", 1, request)
+        assert isinstance(renderer, DefaultRenderer)
