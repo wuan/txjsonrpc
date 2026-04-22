@@ -67,7 +67,7 @@ class BaseSubhandler:
 
 class BaseQueryFactory(protocol.ClientFactory):
     deferred = None
-    protocol = None
+    protocol = None  # type: ignore[assignment]
 
     # XXX add an "id" parameter
     id = 0

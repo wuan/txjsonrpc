@@ -1,0 +1,233 @@
+~~~~~~~~~~
+txJSON-RPC
+~~~~~~~~~~
+
+.. contents::
+   :depth: 1
+
+
+
+
+
+
+README
+
+============
+Dependencies
+============
+
+txJSON-RPC currently has the following dependencies:
+
+* Twisted - http://twistedmatrix.com/
+
+
+
+
+
+
+============
+Installation
+============
+
+Development
+-----------
+
+If you want to develop for txJSON-RPC or use the latest code we're working on,
+you can install from the sources. You'll need bzr installed, and then just do
+the following::
+
+    $ bzr branch lp:txjsonrpc
+    $ cd txjsonrpc
+    $ sudo python setup.py install
+
+
+Easy Install
+------------
+
+You can use the setuptools easy_install script to get txSpore on your system::
+
+    $ sudo easy_install txJSON-RPC
+
+
+Manual Download
+---------------
+
+You can manually download the source tarball from the Python Package Index by
+visiting the following URL:
+
+    http://pypi.python.org/pypi/txJSON-RPC/
+
+You'll need to untar and gunzip the source, cd into the source directory, and
+then you can do the usual::
+
+    $ sudo python setup.py install
+
+
+Checking the Source
+-------------------
+
+Once installed, you can test the source code by executing this from the
+top-level source directory::
+
+    $ trial txjsonrpc
+
+That will run the test suite and report on the success and failure of any unit
+tests.
+
+
+
+
+
+
+=====
+Usage
+=====
+
+
+Examples
+--------
+
+In the top-level source directory for txJSON-RPC, there is an examples
+directory.  This contains the following:
+
+* Client and server examples for twisted.web-based JSON-RPC.
+
+* Client and server examples for Netstring TCP JSON-RPC as well as code shoing
+  how to use subhandlers for the TCP code, since this differs from the
+  XML-RPC/JSON-RPC HTTP-based subhandlers.
+
+Examining each of the Python files in the example directories is the best way
+to get a sense of how to use txJSON-RPC.
+
+
+
+
+
+
+
+====
+TODO
+====
+
+Known Issues
+------------
+
+* txJSON-RPC doesn't yet support the proposed v2.0 JSON-RPC protocol.
+
+* There's a typo in txjsonrpc.meta ("creatig").
+
+* The docs are built with an extraneous "README" added to the text as a result
+  of the README file getting renamed to README.rst.
+
+* Need to add a git mirror on Google Code.
+
+JSON-RPC All
+------------
+
+JSON-RPC over TCP
+-----------------
+
+* add version support in proxy constructor and callRemote method
+
+* add unit tests for proxy's use of version in constructor as well as
+  callRemote
+
+* pull out anything that has to do with setting the payload (e.g.,
+  method/params dict) and put it in jsonrpclib
+
+* clean up error checking, now that errors are going in the payload under the
+  "error" key.
+
+
+JSON-RPC over HTTP (web)
+------------------------
+
+* add unit tests for proxy's use of version in constructor as well as
+  callRemote
+
+
+jsonrpclib
+----------
+
+* return results in simpljson dicts with possible keeys of "result" or "error"
+
+* use simplesjon's hook for creating appropriate JS objects from hints in the
+  results
+
+
+
+
+
+
+=======
+Changes
+=======
+
+txJSON-RPC 0.3.1
+----------------
+
+* Fixed a setup.py bug in the source distribution.
+
+* Removed web2 support (which was breaking txJSON-RPC on modern Twisted
+  releases.)
+
+* Updated json support for modern Python versions.
+
+
+txJSON-RPC 0.3.0
+----------------
+
+* Removed unneeded dependency upon twisted.web2 for the TCP/Netstring JSON-RPC
+  code.
+
+* Updated Netstring JSON-RPC code to allow for setting the MAX_LENGTH
+  attribute.
+
+* Improved documentation.
+
+
+txJSON-RPC 0.2.0
+----------------
+
+* Added a datetime serializer.
+
+
+txJSON-RPC 0.1.0
+----------------
+
+* Bug fix from Moshe Zadka for SimpleParser and long replies.
+
+
+txJSON-RPC 0.0.5
+----------------
+
+* SimpleParser bug fix, improved code abstractions.
+
+
+Twisted-JSONRPC 0.0.4
+---------------------
+
+* Changed name in accord with Twisted community projects recommendations.
+
+
+Twisted-JSONRPC 0.0.3
+---------------------
+
+* Includes support for Twisted JSON-RPC servers/clients over TCP by means of
+  the Netstring protocol.
+
+
+Twisted-JSONRPC 0.0.2
+---------------------
+
+* Includes support for twisted.web2 JSON-RPC servers over HTTP.
+
+
+Twisted-JSONRPC 0.0.1
+---------------------
+
+* Includes support for twisted.web JSON-RPC servers/clients over HTTP.
+
+
+
+

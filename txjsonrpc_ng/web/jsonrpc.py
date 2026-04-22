@@ -41,9 +41,10 @@ from zope.interface import implementer
 
 from txjsonrpc_ng import jsonrpclib
 from txjsonrpc_ng.jsonrpc import BaseProxy, BaseQueryFactory, BaseSubhandler
+from xmlrpc.client import Fault as XMLRPCFault
 
 # Useful so people don't need to import xmlrpclib directly.
-Fault = xmlrpclib.Fault
+Fault = XMLRPCFault
 Binary = xmlrpclib.Binary
 Boolean = xmlrpclib.Boolean
 DateTime = xmlrpclib.DateTime
@@ -121,7 +122,7 @@ class JSONRPC(resource.Resource, BaseSubhandler):
     FAILURE = 8002
 
     isLeaf = 1
-    except_map = {}
+    except_map: dict = {}
     auth_token = "Auth-Token"
 
     def __init__(self):
