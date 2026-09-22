@@ -393,6 +393,7 @@ class TestRenderer:
         cache_result = CacheableResult("test_value")
         cache_result.string_value = "cached_string"
         cache_result.compressed_value = b"cached_compressed"
+        cache_result.render_key = (1, "id1")
 
         renderer = CacheableResultRenderer(cache_result, "id1", 1, request)
 
@@ -448,6 +449,73 @@ class TestRenderer:
 
         renderer = renderer_factory("regular_result", "id1", 1, request)
         assert isinstance(renderer, DefaultRenderer)
+
+    def test_cacheable_result_renderer_rerenders_for_other_version_or_id(self):
+        """A cached rendering must not leak into a different (version, id)."""
+        from txjsonrpc_ng.web.render import CacheableResultRenderer
+
+        request = MagicMock()
+        request.getHeader.return_value = None
+        request.setHeader = MagicMock()
+        request.write = MagicMock()
+
+        cache_result = CacheableResult("test_value")
+
+        def string_renderer(result, id, version):
+            return f"result:{result},id:{id},v:{version}"
+
+        CacheableResultRenderer(cache_result, 0, 0, request).render(string_renderer)
+        assert cache_result.string_value == "result:test_value,id:0,v:0"
+
+        request.write.reset_mock()
+        CacheableResultRenderer(cache_result, 7, 1, request).render(string_renderer)
+        assert cache_result.string_value == "result:test_value,id:7,v:1"
+        request.write.assert_called_once_with(b"result:test_value,id:7,v:1")
+
+    def test_cacheable_result_renderer_reuses_matching_version_and_id(self):
+        """A cached rendering is reused for the same (version, id)."""
+        from txjsonrpc_ng.web.render import CacheableResultRenderer
+
+        request = MagicMock()
+        request.getHeader.return_value = None
+        request.setHeader = MagicMock()
+        request.write = MagicMock()
+
+        cache_result = CacheableResult("test_value")
+        calls = []
+
+        def string_renderer(result, id, version):
+            calls.append((id, version))
+            return f"result:{result},id:{id},v:{version}"
+
+        CacheableResultRenderer(cache_result, 7, 1, request).render(string_renderer)
+        CacheableResultRenderer(cache_result, 7, 1, request).render(string_renderer)
+        assert calls == [(7, 1)]
+
+    def test_cacheable_result_renderer_discards_stale_compression(self):
+        """Re-rendering for another version/id must drop the stale gzip body."""
+        from txjsonrpc_ng.web.render import CacheableResultRenderer
+
+        request = MagicMock()
+        request.getHeader.return_value = "gzip"
+        request.setHeader = MagicMock()
+        request.write = MagicMock()
+
+        cache_result = CacheableResult("x" * 2000)
+
+        def string_renderer(result, id, version):
+            return f"{result}-{id}-{version}"
+
+        CacheableResultRenderer(cache_result, 1, 1, request).render(string_renderer)
+        first_compressed = cache_result.compressed_value
+        assert first_compressed is not None
+
+        CacheableResultRenderer(cache_result, 2, 1, request).render(string_renderer)
+        # The compressed body belongs to the previous rendering and must be
+        # replaced by one produced from the current string.
+        assert cache_result.compressed_value != first_compressed
+        with gzip.GzipFile(fileobj=io.BytesIO(cache_result.compressed_value)) as in_file:
+            assert in_file.read().decode() == "x" * 2000 + "-2-1"
 
 
 def _make_request(body, **args):
@@ -550,6 +618,56 @@ class TestLegacyZeroIdCompatibility:
         parsed = json.loads(written)
         assert parsed["jsonrpc"] == "2.0"
         assert parsed["result"] == {"a": ["b", "c", 12, []], "D": "foo"}
+
+
+class CacheableMixedVersionResource(jsonrpc.JSONRPC):
+    """A resource whose cached result is shared across protocol dialects."""
+
+    treat_zero_id_as_pre1 = True
+
+    def __init__(self):
+        super().__init__()
+        self.result = CacheableResult({"a": 1})
+
+    def jsonrpc_cached(self):
+        return self.result
+
+
+class TestCacheableResultEnvelopeIsolation:
+    """A cached serialization must not leak between protocol dialects.
+
+    A legacy ``id=0`` request caches a bare pre-1.0 array on the
+    :class:`CacheableResult`.  A following v1 request must still receive a
+    version-appropriate object with its own id, not the stale legacy array.
+    """
+
+    def test_legacy_then_versioned_request(self):
+        resource = CacheableMixedVersionResource()
+
+        _, legacy = _render(resource, json.dumps({
+            "method": "cached", "params": [], "id": 0,
+        }).encode())
+        assert json.loads(legacy) == [{"a": 1}]
+
+        _, versioned = _render(resource, json.dumps({
+            "method": "cached", "params": [], "id": 5,
+        }).encode())
+        parsed = json.loads(versioned)
+        assert parsed["id"] == 5
+        assert parsed["result"] == {"a": 1}
+
+    def test_versioned_then_legacy_request(self):
+        resource = CacheableMixedVersionResource()
+
+        _, versioned = _render(resource, json.dumps({
+            "method": "cached", "params": [], "id": 5,
+        }).encode())
+        assert json.loads(versioned)["id"] == 5
+
+        _, legacy = _render(resource, json.dumps({
+            "method": "cached", "params": [], "id": 0,
+        }).encode())
+        assert json.loads(legacy) == [{"a": 1}]
 
 
 class AuthEnforcedJSONRPC(jsonrpc.JSONRPC):

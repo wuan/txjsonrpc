@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2] - 2026-09-23
+
+### Fixed
+- Cached `CacheableResult` renderings are now keyed by the JSON-RPC version and
+  request id.  Previously the first request to populate a cache entry fixed the
+  response envelope (and the echoed id) for every later cache hit, so a legacy
+  pre-1.0 request could make subsequent v1/v2 requests receive the bare-array
+  envelope.
+
 ## [Unreleased]
 
 ### Added

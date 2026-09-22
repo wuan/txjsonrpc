@@ -77,11 +77,19 @@ class CacheableResultRenderer(Renderer):
         self.result = result
 
     def render(self, call: Callable[[Any, str, int], str]) -> None:
-        if self.result.string_value is not None:
+        # The rendered envelope embeds the JSON-RPC version and the request id,
+        # so a cached string may only be reused for the exact same pair.  A
+        # legacy edge case makes this observable: a non-zero id is echoed back
+        # in a v1/v2 envelope while a pre-1.0 response is a bare array.
+        render_key = (self.version, self.id)
+        if self.result.string_value is not None and self.result.render_key == render_key:
             string_value = self.result.string_value
         else:
             string_value = call(self.result.value, self.id, self.version)
             self.result.string_value = string_value
+            self.result.render_key = render_key
+            # The cached compression was produced from the previous string.
+            self.result.compressed_value = None
 
         def update_value(compressed_value: bytes) -> None:
             self.result.compressed_value = compressed_value
