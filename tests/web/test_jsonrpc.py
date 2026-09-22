@@ -669,6 +669,29 @@ class TestCacheableResultEnvelopeIsolation:
         }).encode())
         assert json.loads(legacy) == [{"a": 1}]
 
+    def test_legacy_v1_v2_sequence(self):
+        """The exact sequence the live legacy-protocol suite exercises."""
+        resource = CacheableMixedVersionResource()
+
+        _, legacy = _render(resource, json.dumps({
+            "method": "cached", "params": [], "id": 0,
+        }).encode())
+        assert json.loads(legacy) == [{"a": 1}]
+
+        _, v1 = _render(resource, json.dumps({
+            "method": "cached", "params": [], "id": 1,
+        }).encode())
+        v1_parsed = json.loads(v1)
+        assert v1_parsed["id"] == 1
+        assert v1_parsed["result"] == {"a": 1}
+
+        _, v2 = _render(resource, json.dumps({
+            "jsonrpc": "2.0", "method": "cached", "params": [], "id": 0,
+        }).encode())
+        v2_parsed = json.loads(v2)
+        assert v2_parsed["jsonrpc"] == "2.0"
+        assert v2_parsed["result"] == {"a": 1}
+
 
 class AuthEnforcedJSONRPC(jsonrpc.JSONRPC):
     executed = False
