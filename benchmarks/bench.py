@@ -15,13 +15,13 @@ Usage:
     python benchmarks/bench.py --suite codec
     python benchmarks/bench.py --suite e2e
     python benchmarks/bench.py --json          # machine-readable output
+    python benchmarks/bench.py --metrics-file metrics.json  # flat baseline
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import statistics
 import time
 import timeit
@@ -240,12 +240,12 @@ def _print_e2e(payload):
             print(f"{r['name']}: mean {r['mean']:.3f} ms")
 
 
-def _gh_latency_and_throughput(output):
-    """Convert the nested benchmark output into two flat entry lists.
+def flatten_metrics(output):
+    """Convert the nested benchmark output into a flat, comparable mapping.
 
-    The lists follow the schema expected by
-    ``benchmark-action/github-action-benchmark`` for the custom tools:
-    ``[{"name": str, "unit": str, "value": number}, ...]``.
+    Returns ``{"latency": [...], "throughput": [...]}`` where every entry is
+    ``{"name": str, "unit": str, "value": number}``.  This is the canonical
+    format consumed by :mod:`benchmarks.report` and stored as the baseline.
     """
     latency = []
     throughput = []
@@ -289,25 +289,19 @@ def _gh_latency_and_throughput(output):
                 }
             )
 
-    return latency, throughput
+    return {"latency": latency, "throughput": throughput}
 
 
-def write_gh_benchmark(output, directory):
-    """Write benchmark-action compatible JSON files into ``directory``."""
-    os.makedirs(directory, exist_ok=True)
-    latency, throughput = _gh_latency_and_throughput(output)
-    for filename, entries in (
-        ("latency.json", latency),
-        ("throughput.json", throughput),
-    ):
-        with open(os.path.join(directory, filename), "w") as handle:
-            json.dump(entries, handle, indent=2)
-            handle.write("\n")
+def write_metrics(output, path):
+    """Write the flat metrics file consumed by the reporting/CI tooling."""
+    with open(path, "w") as handle:
+        json.dump(flatten_metrics(output), handle, indent=2)
+        handle.write("\n")
 
 
-def _emit(output, as_json, gh_benchmark_dir=None):
-    if gh_benchmark_dir:
-        write_gh_benchmark(output, gh_benchmark_dir)
+def _emit(output, as_json, metrics_file=None):
+    if metrics_file:
+        write_metrics(output, metrics_file)
     if as_json:
         print(json.dumps(output, indent=2))
         return
@@ -338,10 +332,9 @@ def main():
         "--json", action="store_true", help="emit JSON instead of text"
     )
     parser.add_argument(
-        "--gh-benchmark-dir",
-        metavar="DIR",
-        help="also write github-action-benchmark JSON files (latency.json, "
-        "throughput.json) into DIR",
+        "--metrics-file",
+        metavar="PATH",
+        help="also write the flat metrics JSON (baseline format) to PATH",
     )
     args = parser.parse_args()
 
@@ -357,13 +350,13 @@ def main():
                 total=args.total,
                 concurrency=args.concurrency,
             )
-            _emit(output, args.json, args.gh_benchmark_dir)
+            _emit(output, args.json, args.metrics_file)
 
         # ``task.react`` runs the reactor and calls ``sys.exit`` when the
         # coroutine finishes, so reporting must happen inside it.
         task.react(main_e2e)
     else:
-        _emit(output, args.json, args.gh_benchmark_dir)
+        _emit(output, args.json, args.metrics_file)
 
 
 if __name__ == "__main__":

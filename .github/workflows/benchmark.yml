@@ -14,12 +14,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  benchmark:
-    name: Performance benchmarks
+  # ----------------------------------------------------------------------- #
+  # Pull requests: run benchmarks and post/refresh a single sticky comment.
+  # ----------------------------------------------------------------------- #
+  pull-request:
+    name: PR benchmark
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
-      contents: write       # benchmark-action pushes results to gh-pages
-      pull-requests: write  # benchmark-action comments on pull requests
+      contents: read
+      pull-requests: write  # to create/update the sticky comment
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@0080882f6c36860b6ba35c610c98ce87d4e2f26f # v2.10.2
@@ -29,7 +33,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          fetch-depth: 0  # benchmark-action needs history to fetch gh-pages
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
@@ -44,69 +48,118 @@ jobs:
       - name: Setup environment
         run: poetry install
 
-      - name: Prepare gh-pages branch
-        id: gh-pages
+      - name: Fetch baseline from gh-pages
         run: |
-          if git ls-remote --exit-code --heads origin gh-pages > /dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            current_branch=$(git rev-parse --abbrev-ref HEAD)
-            git checkout --orphan gh-pages
-            git rm -rf .
-            git commit --allow-empty -m "Initialize gh-pages branch"
-            git push origin gh-pages
-            git checkout "$current_branch"
-            echo "exists=true" >> "$GITHUB_OUTPUT"
+          git fetch origin gh-pages || true
+          if git show origin/gh-pages:data/metrics.json > baseline.json 2>/dev/null; then
+            echo "Baseline found."
           else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+            rm -f baseline.json
+            echo "No baseline on gh-pages yet."
           fi
 
       - name: Run benchmarks
         run: |
-          set -o pipefail
-          mkdir -p reports/benchmark
           poetry run python benchmarks/bench.py \
             --sequential 500 --total 2000 --concurrency 64 \
-            --gh-benchmark-dir reports/benchmark \
-            --json | tee reports/benchmark/bench.json
+            --metrics-file current.json
 
-      - name: Upload raw benchmark results
+      - name: Compare with baseline
+        run: |
+          if [ -f baseline.json ]; then
+            BASELINE="--baseline baseline.json"
+          else
+            BASELINE=""
+          fi
+          poetry run python benchmarks/report.py compare \
+            $BASELINE --current current.json --label main --output comment.md
+          cat comment.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload benchmark results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: benchmark-results
-          path: reports/benchmark
+          name: benchmark-results-pr
+          path: |
+            current.json
+            baseline.json
+            comment.md
+          if-no-files-found: ignore
           retention-days: 30
 
-      - name: Store latency benchmark result
-        if: >-
-          steps.gh-pages.outputs.exists == 'true' &&
-          (github.event_name != 'pull_request' ||
-           github.event.pull_request.head.repo.full_name == github.repository)
-        uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1.22.2
+      - name: Add or update PR comment
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
-          tool: customSmallerIsBetter
-          output-file-path: reports/benchmark/latency.json
-          benchmark-data-dir-path: dev/bench/latency
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          comment-on-alert: true
-          alert-threshold: '150%'
-          fail-on-alert: false
+          header: txjsonrpc-benchmark
+          path: comment.md
 
-      - name: Store throughput benchmark result
-        if: >-
-          steps.gh-pages.outputs.exists == 'true' &&
-          (github.event_name != 'pull_request' ||
-           github.event.pull_request.head.repo.full_name == github.repository)
-        uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1.22.2
+  # ----------------------------------------------------------------------- #
+  # Main: run benchmarks and deploy the dashboard (plus the baseline used by
+  # PRs) to the gh-pages branch.
+  # ----------------------------------------------------------------------- #
+  main:
+    name: Deploy benchmark dashboard
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # to push the gh-pages branch
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@0080882f6c36860b6ba35c610c98ce87d4e2f26f # v2.10.2
         with:
-          tool: customBiggerIsBetter
-          output-file-path: reports/benchmark/throughput.json
-          benchmark-data-dir-path: dev/bench/throughput
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          comment-on-alert: true
-          alert-threshold: '150%'
-          fail-on-alert: false
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Run image
+        uses: abatilo/actions-poetry@fd0e6716a0de25ef6ade151b8b53190b0376acfd # v3
+        with:
+          poetry-version: 2.2.1
+
+      - name: Setup environment
+        run: poetry install
+
+      - name: Run benchmarks
+        run: |
+          poetry run python benchmarks/bench.py \
+            --sequential 500 --total 2000 --concurrency 64 \
+            --metrics-file metrics.json
+
+      - name: Build dashboard
+        run: |
+          mkdir -p _site/data
+          git fetch origin gh-pages || true
+          git show origin/gh-pages:data/history.json > _site/data/history.json 2>/dev/null \
+            || echo '[]' > _site/data/history.json
+          cp metrics.json _site/data/metrics.json
+          poetry run python benchmarks/report.py html \
+            --current metrics.json \
+            --history _site/data/history.json \
+            --output _site/index.html \
+            --commit "$GITHUB_SHA"
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: benchmark-results-main
+          path: |
+            metrics.json
+            _site
+          retention-days: 30
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./_site
+          user_name: github-actions[bot]
+          user_email: github-actions[bot]@users.noreply.github.com
+          commit_message: "Deploy benchmark dashboard for ${{ github.sha }}"

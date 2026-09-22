@@ -9,6 +9,7 @@ Thank you for your interest in contributing to txjsonrpc-ng! This document provi
 - [Development Setup](#development-setup)
 - [Making Changes](#making-changes)
 - [Testing](#testing)
+- [Performance Benchmarks](#performance-benchmarks)
 - [Code Style](#code-style)
 - [Submitting Changes](#submitting-changes)
 - [Reporting Bugs](#reporting-bugs)
@@ -126,6 +127,15 @@ poetry run pytest -v
 - Follow the existing test structure and patterns
 
 Test files should be in the `tests/` directory and named `test_*.py`.
+
+### Performance Benchmarks
+
+The project ships a small benchmark harness under `benchmarks/` (codec
+micro-benchmarks and end-to-end RPC over loopback TCP). CI runs it for pull
+requests and publishes a dashboard from `main`.
+
+See [`benchmarks/README.md`](benchmarks/README.md) for local usage and the CI /
+gh-pages setup.
 
 Example:
 ```python
