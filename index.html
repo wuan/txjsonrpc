@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>txjsonrpc-ng performance</title>
+<style>
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 2rem 1rem; font: 15px/1.5 -apple-system, BlinkMacSystemFont,
+  "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  max-width: 1100px; margin-inline: auto;
+}
+h1 { margin: 0 0 .25rem; font-size: 1.6rem; }
+h2 { margin: 2rem 0 .75rem; font-size: 1.2rem; }
+.meta { color: #6b7280; margin: 0 0 1.5rem; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { padding: .45rem .6rem; border-bottom: 1px solid #0002; text-align: left; }
+th { font-weight: 600; border-bottom-width: 2px; }
+td.num, th:not(:first-child) { text-align: right; }
+td.good { color: #15803d; }
+td.bad { color: #b91c1c; }
+.charts { display: grid; gap: 1rem; grid-template-columns:
+  repeat(auto-fill, minmax(280px, 1fr)); margin-top: 1.25rem; }
+.chart { margin: 0; padding: .6rem .75rem; border: 1px solid #0002;
+  border-radius: 8px; }
+.chart figcaption { font-size: .85rem; display: flex;
+  justify-content: space-between; gap: .5rem; }
+.chart figcaption span { color: #6b7280; white-space: nowrap; }
+.spark { width: 100%; height: 70px; display: block; margin-top: .4rem; }
+.spark polyline { fill: none; stroke: #2563eb; stroke-width: 2;
+  vector-effect: non-scaling-stroke; }
+.spark circle { fill: #2563eb; }
+footer { margin-top: 2.5rem; color: #6b7280; font-size: .85rem; }
+</style>
+</head>
+<body>
+<h1>txjsonrpc-ng performance</h1>
+<p class="meta">Latest run <code>a41065f6ac</code> &middot;
+generated 2026-09-22T20:37:34+00:00 &middot; 1 run(s) in history</p>
+<section><h2>Latency (lower is better)</h2><table><thead><tr><th>Metric</th><th>Current</th></tr></thead><tbody><tr><td>codec/dumps small result (v2)</td><td class='num'>2.96 us</td></tr><tr><td>codec/dumps complex result (v2)</td><td class='num'>11.79 us</td></tr><tr><td>codec/loads small request</td><td class='num'>1.92 us</td></tr><tr><td>codec/loads complex request</td><td class='num'>1.79 us</td></tr><tr><td>codec/_getFunction dispatch</td><td class='num'>0.30 us</td></tr><tr><td>e2e/sequential mean</td><td class='num'>0.47 ms</td></tr><tr><td>e2e/sequential p50</td><td class='num'>0.46 ms</td></tr><tr><td>e2e/sequential p95</td><td class='num'>0.52 ms</td></tr><tr><td>e2e/sequential p99</td><td class='num'>0.57 ms</td></tr><tr><td>e2e/complex payload</td><td class='num'>0.46 ms</td></tr></tbody></table><div class="charts"><figure class="chart"><figcaption>codec/dumps small result (v2) <span>2.96 us</span></figcaption><svg class="spark" viewBox="0 0 280 70" preserveAspectRatio="none" role="img" aria-label="trend from 2.956 to 2.956"><polyline points="6.0,64.0" /><circle cx="6.0" cy="64.0" r="2.5" /></svg></figure><figure class="chart"><figcaption>codec/dumps complex result (v2) <span>11.79 us</span></figcaption><svg class="spark" viewBox="0 0 280 70" preserveAspectRatio="none" role="img" aria-label="trend from 11.79 to 11.79"><polyline points="6.0,64.0" /><circle cx="6.0" cy="64.0" r="2.5" /></svg></figure><figure class="chart"><figcaption>codec/loads small request <span>1.92 us</span></figcaption><svg class="spark" viewBox="0 0 280 70" preserveAspectRatio="none" role="img" aria-label="trend from 1.924 to 1.924"><polyline points="6.0,64.0" /><circle cx="6.0" cy="64.0" r="2.5" /></svg></figure><figure class="chart"><figcaption>codec/loads complex request <span>1.79 us</span></figcaption><svg class="spark" viewBox="0 0 280 70" preserveAspectRatio="none" role="img" aria-label="trend from 1.791 to 1.791"><polyline points="6.0,64.0" /><circle cx="6.0" cy="64.0" r="2.5" /></svg></figure><figure class="chart"><figcaption>codec/_getFunction dispatch <span>0.30 us</span></figcaption><svg class="spark" viewBox="0 0 280 70" preserveAspectRatio="none" role="img" aria-label="trend from 0.3029 to 0.3029"><polyline points="6.0,64.0" /><circle cx="6.0" cy="64.0" r="2.5" /></svg></figure><figure class="chart"><figcaption>e2e/sequential mean <span>0.47 ms</span></figcaption><svg class="spark" viewBox="0 0 280 70" preserveAspectRatio="none" role="img" aria-label="trend from 0.4688 to 0.4688"><polyline points="6.0,64.0" /><circle cx="6.0" cy="64.0" r="2.5" /></svg></figure><figure class="chart"><figcaption>e2e/sequential p50 <span>0.46 ms</span></figcaption><svg class="spark" viewBox="0 0 280 70" preserveAspectRatio="none" role="img" aria-label="trend from 0.4618 to 0.4618"><polyline points="6.0,64.0" /><circle cx="6.0" cy="64.0" r="2.5" /></svg></figure><figure class="chart"><figcaption>e2e/sequential p95 <span>0.52 ms</span></figcaption><svg class="spark" viewBox="0 0 280 70" preserveAspectRatio="none" role="img" aria-label="trend from 0.5189 to 0.5189"><polyline points="6.0,64.0" /><circle cx="6.0" cy="64.0" r="2.5" /></svg></figure><figure class="chart"><figcaption>e2e/sequential p99 <span>0.57 ms</span></figcaption><svg class="spark" viewBox="0 0 280 70" preserveAspectRatio="none" role="img" aria-label="trend from 0.5711 to 0.5711"><polyline points="6.0,64.0" /><circle cx="6.0" cy="64.0" r="2.5" /></svg></figure><figure class="chart"><figcaption>e2e/complex payload <span>0.46 ms</span></figcaption><svg class="spark" viewBox="0 0 280 70" preserveAspectRatio="none" role="img" aria-label="trend from 0.4634 to 0.4634"><polyline points="6.0,64.0" /><circle cx="6.0" cy="64.0" r="2.5" /></svg></figure></div></section><section><h2>Throughput (higher is better)</h2><table><thead><tr><th>Metric</th><th>Current</th></tr></thead><tbody><tr><td>codec/dumps small result (v2)</td><td class='num'>338,306 ops/s</td></tr><tr><td>codec/dumps complex result (v2)</td><td class='num'>84,836 ops/s</td></tr><tr><td>codec/loads small request</td><td class='num'>519,854 ops/s</td></tr><tr><td>codec/loads complex request</td><td class='num'>558,450 ops/s</td></tr><tr><td>codec/_getFunction dispatch</td><td class='num'>3,301,100 ops/s</td></tr><tr><td>e2e/concurrent calls</td><td class='num'>63 ops/s</td></tr></tbody></table><div class="charts"><figure class="chart"><figcaption>codec/dumps small result (v2) <span>338,306 ops/s</span></figcaption><svg class="spark" viewBox="0 0 280 70" preserveAspectRatio="none" role="img" aria-label="trend from 3.383e+05 to 3.383e+05"><polyline points="6.0,64.0" /><circle cx="6.0" cy="64.0" r="2.5" /></svg></figure><figure class="chart"><figcaption>codec/dumps complex result (v2) <span>84,836 ops/s</span></figcaption><svg class="spark" viewBox="0 0 280 70" preserveAspectRatio="none" role="img" aria-label="trend from 8.484e+04 to 8.484e+04"><polyline points="6.0,64.0" /><circle cx="6.0" cy="64.0" r="2.5" /></svg></figure><figure class="chart"><figcaption>codec/loads small request <span>519,854 ops/s</span></figcaption><svg class="spark" viewBox="0 0 280 70" preserveAspectRatio="none" role="img" aria-label="trend from 5.199e+05 to 5.199e+05"><polyline points="6.0,64.0" /><circle cx="6.0" cy="64.0" r="2.5" /></svg></figure><figure class="chart"><figcaption>codec/loads complex request <span>558,450 ops/s</span></figcaption><svg class="spark" viewBox="0 0 280 70" preserveAspectRatio="none" role="img" aria-label="trend from 5.585e+05 to 5.585e+05"><polyline points="6.0,64.0" /><circle cx="6.0" cy="64.0" r="2.5" /></svg></figure><figure class="chart"><figcaption>codec/_getFunction dispatch <span>3,301,100 ops/s</span></figcaption><svg class="spark" viewBox="0 0 280 70" preserveAspectRatio="none" role="img" aria-label="trend from 3.301e+06 to 3.301e+06"><polyline points="6.0,64.0" /><circle cx="6.0" cy="64.0" r="2.5" /></svg></figure><figure class="chart"><figcaption>e2e/concurrent calls <span>63 ops/s</span></figcaption><svg class="spark" viewBox="0 0 280 70" preserveAspectRatio="none" role="img" aria-label="trend from 63 to 63"><polyline points="6.0,64.0" /><circle cx="6.0" cy="64.0" r="2.5" /></svg></figure></div></section>
+<footer>Values come from a shared CI runner; use the trends, not the absolutes.</footer>
+</body>
+</html>
