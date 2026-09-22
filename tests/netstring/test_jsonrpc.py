@@ -73,9 +73,6 @@ class ResourceForTest(JSONRPC):
     def jsonrpc_dict(self, map, key):
         return map[key]
 
-    def getFunction(self, functionPath):
-        return JSONRPC.getFunction(self, functionPath)
-
     jsonrpc_dict.help = 'Help for dict.'
 
 
@@ -83,7 +80,7 @@ class QueryFactoryTestCase(unittest.TestCase):
 
     def testCreation(self):
         factory = QueryFactory("mymethod", "myarg1", "myarg2")
-        self.assertEquals(factory.protocol.MAX_LENGTH, 99999)
+        self.assertEqual(factory.protocol.MAX_LENGTH, 99999)
 
 
 @pytest.fixture
@@ -212,3 +209,21 @@ class TestJSONRPCIntrospection:
     async def testMethodSignature(self, proxy, method_name, expected):
         response = await proxy.callRemote("system.methodSignature", method_name, version=2)
         assert response == expected
+
+
+class TestErrorHandling:
+    """
+    Errors during dispatch must be reported as JSON-RPC faults, not raised out
+    of the protocol handler.
+    """
+
+    async def test_unknown_method_returns_fault(self, proxy):
+        with pytest.raises(jsonrpclib.Fault) as exc_info:
+            await proxy.callRemote("noSuchMethod")
+        assert exc_info.value.faultCode == jsonrpclib.METHOD_NOT_FOUND
+
+
+class TestNamedParameters:
+    async def test_named_params(self, proxy):
+        response = await proxy.callRemote("add", a=2, b=3)
+        assert response == 5

@@ -1,10 +1,10 @@
 from dataclasses import dataclass
-from typing import Union, Dict, List, Optional
+from typing import Any, Optional
 
 
 @dataclass
 class CacheableResult:
-    value: Union[Dict, List]
+    value: Any
     string_value: Optional[str] = None
     compressed_value: Optional[bytes] = None
 

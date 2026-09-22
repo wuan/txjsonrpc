@@ -1,9 +1,15 @@
+import itertools
 from typing import List
 
 from twisted.internet import defer, protocol
 from twisted.python import reflect
 
 from txjsonrpc_ng import jsonrpclib
+
+
+#: Process-wide monotonic request id source.  Using a single shared counter
+#: guarantees that concurrently issued requests receive distinct ids.
+_id_counter = itertools.count(1)
 
 
 class BaseSubhandler:
@@ -69,23 +75,26 @@ class BaseQueryFactory(protocol.ClientFactory):
     deferred = None
     protocol = None  # type: ignore[assignment]
 
-    # XXX add an "id" parameter
     id = 0
 
-    def __init__(self, method, version=jsonrpclib.VERSION_PRE1, *args):
-        # XXX pass the "id" parameter here
+    def __init__(self, method, version=jsonrpclib.VERSION_PRE1, *args, **kwargs):
         self.version = version
-        self.id = self.id + 1
-        self.payload = self._buildVersionedPayload(method, args)
+        self.id = next(_id_counter)
+        self.payload = self._buildVersionedPayload(method, args, kwargs)
         self.deferred = defer.Deferred()
 
-    def _buildVersionedPayload(self, *args):
+    def _buildVersionedPayload(self, method="", args=None, kwargs=None):
+        args = list(args) if args else []
+        kwargs = kwargs or {}
+        # JSON-RPC named parameters are sent as a JSON object; positional
+        # parameters as a JSON array.
+        params = kwargs if kwargs else args
         if self.version == jsonrpclib.VERSION_PRE1:
-            return jsonrpclib._preV1Request(*args)
+            return jsonrpclib._preV1Request(method, params)
         elif self.version == jsonrpclib.VERSION_1:
-            return jsonrpclib._v1Request(*args, id=self.id)
+            return jsonrpclib._v1Request(method, params, id=self.id)
         elif self.version == jsonrpclib.VERSION_2:
-            return jsonrpclib._v2Request(*args, id=self.id)
+            return jsonrpclib._v2Request(method, params, id=self.id)
 
     def parseResponse(self, contents):
         if not self.deferred:

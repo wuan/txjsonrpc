@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from pytest_twisted import inlineCallbacks
 
@@ -20,12 +22,12 @@ class TestBaseQueryFactory:
     def test_buildVersionedPayload1(self):
         factory = BaseQueryFactory("someMethod", version=VERSION_1)
         payload = factory._buildVersionedPayload()
-        assert payload == '{"method": "", "params": [], "id": 1}'
+        assert payload == '{"method": "", "params": [], "id": %d}' % factory.id
 
     def test_buildVersionedPayload2(self):
         factory = BaseQueryFactory("someMethod", version=VERSION_2)
         payload = factory._buildVersionedPayload()
-        assert payload == '{"jsonrpc": "2.0", "method": "", "params": [], "id": 1}'
+        assert payload == '{"jsonrpc": "2.0", "method": "", "params": [], "id": %d}' % factory.id
 
     @inlineCallbacks
     def test_parseResponseNoJSON(self):
@@ -99,3 +101,18 @@ class TestBaseProxy:
         proxy = BaseProxy()
         factoryClass = proxy._getFactoryClass({"factoryClass": FakeFactory})
         assert factoryClass == FakeFactory
+
+
+class TestUniqueIds:
+
+    def test_ids_are_unique(self):
+        factories = [BaseQueryFactory("someMethod", version=VERSION_1)
+                     for _ in range(5)]
+        ids = [factory.id for factory in factories]
+        assert len(set(ids)) == len(ids)
+
+    def test_named_params_payload(self):
+        factory = BaseQueryFactory(
+            "someMethod", version=VERSION_2, alpha=1, beta=2)
+        payload = json.loads(factory.payload)
+        assert payload["params"] == {"alpha": 1, "beta": 2}

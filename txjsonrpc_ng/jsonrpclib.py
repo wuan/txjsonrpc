@@ -74,7 +74,7 @@ def dumps(obj, **kwargs):
         result = obj
         error = None
     if version == VERSION_PRE1:
-        if result:
+        if result is not None:
             obj = result
         else:
             obj = error
@@ -98,16 +98,19 @@ def loads(string, **kws):
     # None.
     if (isinstance(unmarshalled, dict) and "fault" in unmarshalled):
         raise Fault(unmarshalled['faultCode'], unmarshalled['faultString'])
-    if (isinstance(unmarshalled, dict) and "error" in unmarshalled):
-        if "jsonrpc" in unmarshalled and unmarshalled["jsonrpc"] == "2.0":
-            raise Fault(unmarshalled["error"]['code'], unmarshalled["error"]['message'])
-        if unmarshalled['error']:
-            raise Fault(unmarshalled["error"]['faultCode'], unmarshalled["error"]['faultString'])
+    if isinstance(unmarshalled, dict) and "error" in unmarshalled:
+        error = unmarshalled["error"]
+        if error:
+            if unmarshalled.get("jsonrpc") == "2.0":
+                raise Fault(error['code'], error['message'])
+            raise Fault(error['faultCode'], error['faultString'])
     return unmarshalled
 
 
 class SimpleParser(object):
-    buffer = ''
+
+    def __init__(self):
+        self.buffer = ''
 
     def feed(self, data):
         self.buffer += data
@@ -150,35 +153,41 @@ class Transport(xmlrpclib.Transport):
         return getparser()
 
 
-def _preV1Request(method="", params=[], *args):
-    return dumps({"method": method, "params": params})
+def _preV1Request(method="", params=None, *args):
+    return dumps({"method": method, "params": [] if params is None else params})
 
 
-def _v1Request(method="", params=[], id="", *args):
+def _v1Request(method="", params=None, id="", *args):
     return dumps(
-        {"method": method, "params": params, "id": id})
+        {"method": method, "params": [] if params is None else params, "id": id})
 
 
-def _v1Notification(method="", params=[], *args):
+def _v1Notification(method="", params=None, *args):
     return _v1Request(method=method, params=params, id=None)
 
 
-def _v2Request(method="", params=[], id="", *args):
+def _v2Request(method="", params=None, id="", *args):
     return dumps({
-        "jsonrpc": "2.0", "method": method, "params": params, "id": id})
+        "jsonrpc": "2.0", "method": method,
+        "params": [] if params is None else params, "id": id})
 
 
-def _v2Notification(method="", params=[], *args):
+def _v2Notification(method="", params=None, *args):
     return _v2Request(method=method, params=params, id=None)
 
 
 class ServerProxy(xmlrpclib.ServerProxy):
     """
-    XXX add missing docstring
+    A blocking JSON-RPC client proxy mirroring C{xmlrpclib.ServerProxy}.
+
+    Unlike L{txjsonrpc_ng.web.jsonrpc.Proxy} and
+    L{txjsonrpc_ng.netstring.jsonrpc.Proxy}, this makes synchronous requests.
     """
 
-    def __init__(self, uri, transport=Transport(), version=VERSION_PRE1, *args,
+    def __init__(self, uri, transport=None, version=VERSION_PRE1, *args,
                  **kwds):
+        if transport is None:
+            transport = Transport()
         xmlrpclib.ServerProxy.__init__(self, uri, transport, *args, **kwds)
         self.version = version
 

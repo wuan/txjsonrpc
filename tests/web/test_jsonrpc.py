@@ -5,18 +5,20 @@ Test JSON-RPC support.
 """
 import gzip
 import io
+import json
 from unittest.mock import MagicMock
 
 import pytest
 from twisted.internet import reactor, defer
 from twisted.web import server, static
 from twisted.web.http import Request
+from twisted.web.test.requesthelper import DummyRequest
 
 from txjsonrpc_ng import jsonrpclib
 from txjsonrpc_ng.jsonrpc import addIntrospection
 from txjsonrpc_ng.web import jsonrpc
 from txjsonrpc_ng.web.data import CacheableResult
-from txjsonrpc_ng.web.jsonrpc import with_request
+from txjsonrpc_ng.web.jsonrpc import requires_auth, with_request
 
 
 class RuntimeErrorTest(RuntimeError):
@@ -195,10 +197,9 @@ class TestJSONRPCIntrospection:
         assert response == expected
 
 
-class NoTestCompressedJSONRPC(TestJSONRPCTest):
+class TestCompressedJSONRPC(TestJSONRPCTest):
     """
-    Tests for the original, pre-version 1.0 spec that txJSON-RPC was
-    originally released as.
+    Tests that JSON-RPC still works when the client negotiates gzip.
     """
 
     @pytest.fixture
@@ -336,7 +337,7 @@ class TestAuthenticatedProxy(TestJSONRPCTest):
         assert response == [self.user, self.password]
 
 
-class ProxyErrorHandlingTestCase:
+class TestProxyErrorHandling:
 
     @pytest.fixture
     def site_port(self):
@@ -350,8 +351,8 @@ class ProxyErrorHandlingTestCase:
     async def testErroneousResponse(self, site_port):
         proxy = jsonrpc.Proxy(
             "http://127.0.0.1:%d/" % (site_port,))
-        return self.assertFailure(
-            await proxy.callRemote("someMethod"), Exception)
+        with pytest.raises(Exception):
+            await proxy.callRemote("someMethod")
 
 
 class TestRenderer:
@@ -448,3 +449,135 @@ class TestRenderer:
 
         renderer = renderer_factory("regular_result", "id1", 1, request)
         assert isinstance(renderer, DefaultRenderer)
+
+
+def _make_request(body, **args):
+    """
+    Build a DummyRequest carrying *body* as the POST content.
+    """
+    request = DummyRequest([b''])
+    request.content = io.BytesIO(body)
+    request.method = b'POST'
+    for key, value in args.items():
+        request.args[key] = [value]
+    request._finishedDeferreds = []
+    return request
+
+
+def _render(resource, body, **args):
+    request = _make_request(body, **args)
+    resource.render(request)
+    return request, b"".join(request.written)
+
+
+class TestInvalidRequests:
+    """
+    Malformed or schema-invalid requests must yield a JSON-RPC fault rather
+    than an unhandled exception (HTTP 500).
+    """
+
+    class Resource(jsonrpc.JSONRPC):
+        def jsonrpc_complex(self):
+            return {"a": ["b", "c", 12, []], "D": "foo"}
+
+    @pytest.mark.parametrize("body", (
+            b"{not json",
+            b"",
+            b'[{"jsonrpc": "2.0", "method": "complex", "params": [], "id": 1}]',
+            b'{"jsonrpc": "2.0", "id": 1}',
+    ))
+    def test_invalid_request_returns_fault(self, body):
+        _, written = _render(self.Resource(), body)
+        with pytest.raises(jsonrpclib.Fault):
+            jsonrpclib.loads(written.decode())
+
+    def test_params_null_is_treated_as_no_params(self):
+        body = json.dumps({
+            "jsonrpc": "2.0", "method": "complex", "params": None, "id": 1,
+        }).encode()
+        _, written = _render(self.Resource(), body)
+        parsed = json.loads(written)
+        assert parsed["result"] == {"a": ["b", "c", 12, []], "D": "foo"}
+
+    def test_id_zero_selects_version_1_envelope(self):
+        body = json.dumps({"method": "complex", "params": [], "id": 0}).encode()
+        _, written = _render(self.Resource(), body)
+        parsed = json.loads(written)
+        # A pre-1.0 response would be the bare result value; an id of 0 must
+        # still be recognised as JSON-RPC 1.0 and wrapped in a result envelope.
+        assert parsed["id"] == 0
+        assert parsed["result"] == {"a": ["b", "c", 12, []], "D": "foo"}
+
+
+class AuthEnforcedJSONRPC(jsonrpc.JSONRPC):
+    executed = False
+
+    def auth(self, token, func):
+        return False
+
+    @requires_auth
+    def jsonrpc_secret(self):
+        AuthEnforcedJSONRPC.executed = True
+        return "secret"
+
+
+class TestAuthEnforcement:
+    """
+    A falsy result from ``auth`` must deny the request, not merely delay it.
+    """
+
+    def test_denied_auth_does_not_execute(self):
+        AuthEnforcedJSONRPC.executed = False
+        body = jsonrpclib._v1Request("secret", [], 1).encode()
+        _, written = _render(AuthEnforcedJSONRPC(), body)
+        with pytest.raises(jsonrpclib.Fault) as exc_info:
+            jsonrpclib.loads(written.decode())
+        assert exc_info.value.faultCode == 4000
+        assert AuthEnforcedJSONRPC.executed is False
+
+
+class JsonpJsonRpcTest(jsonrpc.JSONRPC):
+    def __init__(self):
+        super().__init__()
+        self.pending = {}
+
+    def jsonrpc_slow(self, n):
+        d = defer.Deferred()
+        self.pending[n] = d
+        return d
+
+
+class TestJsonpIsolation:
+    """
+    Interleaved JSONP requests must not leak their callback names into each
+    other's responses.
+    """
+
+    def test_interleaved_requests_keep_callbacks(self):
+        resource = JsonpJsonRpcTest()
+        request_a = _make_request(
+            jsonrpclib._v1Request("slow", ["a"], 1).encode(),
+            callback="CALLBACK_A")
+        request_b = _make_request(
+            jsonrpclib._v1Request("slow", ["b"], 2).encode(),
+            callback="CALLBACK_B")
+
+        resource.render(request_a)
+        resource.render(request_b)
+        resource.pending["a"].callback("result-A")
+
+        body_a = b"".join(request_a.written).decode()
+        body_b = b"".join(request_b.written).decode()
+        assert body_a.startswith("CALLBACK_A(")
+        assert "result-A" in body_a
+        assert body_b == ""
+
+
+class TestNamedParameters:
+    """
+    Client keyword arguments are forwarded as JSON-RPC named parameters.
+    """
+
+    async def test_named_params(self, proxy):
+        response = await proxy.callRemote("add", a=2, b=3)
+        assert response == 5
