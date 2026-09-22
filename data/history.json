@@ -88,5 +88,95 @@
         }
       ]
     }
+  },
+  {
+    "commit": "68b89f9e9e288c7946c384e3fc437950a5602a06",
+    "timestamp": "2026-09-22T23:15:00+00:00",
+    "metrics": {
+      "latency": [
+        {
+          "name": "codec/dumps small result (v2)",
+          "unit": "us",
+          "value": 3.8309
+        },
+        {
+          "name": "codec/dumps complex result (v2)",
+          "unit": "us",
+          "value": 15.1493
+        },
+        {
+          "name": "codec/loads small request",
+          "unit": "us",
+          "value": 2.4414
+        },
+        {
+          "name": "codec/loads complex request",
+          "unit": "us",
+          "value": 2.316
+        },
+        {
+          "name": "codec/_getFunction dispatch",
+          "unit": "us",
+          "value": 0.489
+        },
+        {
+          "name": "e2e/sequential mean",
+          "unit": "ms",
+          "value": 0.6818
+        },
+        {
+          "name": "e2e/sequential p50",
+          "unit": "ms",
+          "value": 0.6731
+        },
+        {
+          "name": "e2e/sequential p95",
+          "unit": "ms",
+          "value": 0.758
+        },
+        {
+          "name": "e2e/sequential p99",
+          "unit": "ms",
+          "value": 0.7947
+        },
+        {
+          "name": "e2e/complex payload",
+          "unit": "ms",
+          "value": 0.6925
+        }
+      ],
+      "throughput": [
+        {
+          "name": "codec/dumps small result (v2)",
+          "unit": "ops/s",
+          "value": 261037.89
+        },
+        {
+          "name": "codec/dumps complex result (v2)",
+          "unit": "ops/s",
+          "value": 66009.63
+        },
+        {
+          "name": "codec/loads small request",
+          "unit": "ops/s",
+          "value": 409609.18
+        },
+        {
+          "name": "codec/loads complex request",
+          "unit": "ops/s",
+          "value": 431772.63
+        },
+        {
+          "name": "codec/_getFunction dispatch",
+          "unit": "ops/s",
+          "value": 2044851.87
+        },
+        {
+          "name": "e2e/concurrent calls",
+          "unit": "ops/s",
+          "value": 62.98
+        }
+      ]
+    }
   }
 ]
