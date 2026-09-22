@@ -130,20 +130,20 @@ Test files should be in the `tests/` directory and named `test_*.py`.
 Example:
 ```python
 import pytest
-from twisted.trial import unittest
 from txjsonrpc_ng.web.jsonrpc import Handler
 
-class TestMyFeature(unittest.TestCase):
+
+class TestMyFeature:
     def test_my_feature_does_something(self):
         """Test that my feature behaves correctly"""
         # Arrange
         handler = Handler()
-        
+
         # Act
         result = handler.my_feature()
-        
+
         # Assert
-        self.assertEqual(result, expected_value)
+        assert result == expected_value
 ```
 
 ## Code Style

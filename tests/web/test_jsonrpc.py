@@ -6,10 +6,10 @@ Test JSON-RPC support.
 import gzip
 import io
 import json
-from unittest.mock import MagicMock
 
 import pytest
-from twisted.internet import reactor, defer
+from mock import MagicMock
+from twisted.internet import defer, reactor
 from twisted.web import server, static
 from twisted.web.http import Request
 from twisted.web.test.requesthelper import DummyRequest
@@ -182,7 +182,7 @@ class TestJSONRPCIntrospection:
             ("fail", ""),
             ("dict", "Help for dict.")
     ))
-    async def testMethodHelp(self, proxy, method, expected):
+    async def test_method_help(self, proxy, method, expected):
         response = await proxy.callRemote("system.methodHelp", method)
         assert response == expected
 
@@ -192,7 +192,7 @@ class TestJSONRPCIntrospection:
                      ['double', 'double', 'double']]),
             ("pair", [['array', 'string', 'int']])
     ))
-    async def testMethodSignature(self, proxy, method, expected):
+    async def test_method_signature(self, proxy, method, expected):
         response = await proxy.callRemote("system.methodSignature", method)
         assert response == expected
 
@@ -321,17 +321,17 @@ class TestAuthenticatedProxy(TestJSONRPCTest):
     def proxy(self, site_port):
         return jsonrpc.Proxy("http://%s:%s@127.0.0.1:%d/" % (self.user, self.password, site_port))
 
-    async def test_auth_info_in_URL(self, site_port):
+    async def test_auth_info_in_url(self, site_port):
         proxy = jsonrpc.Proxy("http://%s:%s@127.0.0.1:%d/" % (self.user, self.password, site_port))
         response = await proxy.callRemote("authinfo")
         assert response == [self.user, self.password]
 
-    async def testExplicitAuthInfo(self, site_port):
+    async def test_explicit_auth_info(self, site_port):
         proxy = jsonrpc.Proxy("http://127.0.0.1:%d/" % (site_port), self.user, self.password)
         response = await proxy.callRemote("authinfo")
         assert response == [self.user, self.password]
 
-    async def testExplicitAuthInfoOverride(self, site_port):
+    async def test_explicit_auth_info_override(self, site_port):
         proxy = jsonrpc.Proxy("http://wrong:info@127.0.0.1:%d/" % (site_port), self.user, self.password)
         response = await proxy.callRemote("authinfo")
         assert response == [self.user, self.password]
@@ -348,7 +348,7 @@ class TestProxyErrorHandling:
         yield p.getHost().port
         p.stopListening()
 
-    async def testErroneousResponse(self, site_port):
+    async def test_erroneous_response(self, site_port):
         proxy = jsonrpc.Proxy(
             "http://127.0.0.1:%d/" % (site_port,))
         with pytest.raises(Exception):
@@ -361,7 +361,6 @@ class TestRenderer:
     def test_default_renderer_basic(self):
         """Test DefaultRenderer basic rendering."""
         from txjsonrpc_ng.web.render import DefaultRenderer
-        from unittest.mock import MagicMock
 
         # Create mock request
         request = MagicMock()
@@ -431,7 +430,7 @@ class TestRenderer:
 
     def test_renderer_factory_cacheable(self):
         """Test renderer_factory returns CacheableResultRenderer for CacheableResult."""
-        from txjsonrpc_ng.web.render import renderer_factory, CacheableResultRenderer
+        from txjsonrpc_ng.web.render import CacheableResultRenderer, renderer_factory
 
         request = MagicMock()
         request.getHeader.return_value = None
@@ -442,7 +441,7 @@ class TestRenderer:
 
     def test_renderer_factory_default(self):
         """Test renderer_factory returns DefaultRenderer for regular result."""
-        from txjsonrpc_ng.web.render import renderer_factory, DefaultRenderer
+        from txjsonrpc_ng.web.render import DefaultRenderer, renderer_factory
 
         request = MagicMock()
         request.getHeader.return_value = None

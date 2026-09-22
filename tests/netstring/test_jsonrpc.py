@@ -6,7 +6,6 @@ Test JSON-RPC over TCP support.
 
 import pytest
 from twisted.internet import reactor, defer
-from twisted.trial import unittest
 
 from txjsonrpc_ng import jsonrpclib
 from txjsonrpc_ng.jsonrpclib import VERSION_2
@@ -76,11 +75,11 @@ class ResourceForTest(JSONRPC):
     jsonrpc_dict.help = 'Help for dict.'
 
 
-class QueryFactoryTestCase(unittest.TestCase):
+class TestQueryFactory:
 
-    def testCreation(self):
+    def test_creation(self):
         factory = QueryFactory("mymethod", "myarg1", "myarg2")
-        self.assertEqual(factory.protocol.MAX_LENGTH, 99999)
+        assert factory.protocol.MAX_LENGTH == 99999
 
 
 @pytest.fixture
@@ -107,7 +106,7 @@ class TestJsonRPC:
             ("pair", ("a", 1), ["a", 1]),
             ("complex", (), {"a": ["b", "c", 12, []], "D": "foo"})
     ))
-    async def testResults(self, proxy, method, args, expected):
+    async def test_results(self, proxy, method, args, expected):
         response = await proxy.callRemote(method, *args)
         assert response == expected
 
@@ -116,7 +115,7 @@ class TestJsonRPC:
             (12, "fault"),
             (17, "deferFault")
     ))
-    async def testErrors(self, proxy, code, method_name):
+    async def test_errors(self, proxy, code, method_name):
         with pytest.raises(jsonrpclib.Fault) as exc_info:
             await proxy.callRemote(method_name)
 
@@ -140,8 +139,8 @@ class TestJSONRPCClassMaxLength:
         self.maxLengths = lengths
         return proxy
 
-    async def testResults(self, proxy):
-        response = await proxy.callRemote("add", *[2,3])
+    async def test_results(self, proxy):
+        response = await proxy.callRemote("add", *[2, 3])
         assert response["result"] == 5
         assert self.maxLengths == [1]
 
@@ -155,7 +154,7 @@ class TestJSONRPCMethodMaxLength:
             ("pair", ("a", 1), ["a", 1]),
             ("complex", (), {"a": ["b", "c", 12, []], "D": "foo"})
     ))
-    async def testResults(self, proxy, method_name, args, expected):
+    async def test_results(self, proxy, method_name, args, expected):
         lengths = []
 
         class Factory(QueryFactory):
@@ -179,7 +178,7 @@ class TestJSONRPCIntrospection:
         yield server.getHost().port
         server.stopListening()
 
-    async def testListMethods(self, proxy):
+    async def test_list_methods(self, proxy):
         d = await proxy.callRemote("system.listMethods", version=2)
 
         d.sort()
@@ -196,7 +195,7 @@ class TestJSONRPCIntrospection:
             ("fail", ""),
             ("dict", "Help for dict.")
     ))
-    async def testMethodHelp(self, proxy, method_name, expected):
+    async def test_method_help(self, proxy, method_name, expected):
         d = await proxy.callRemote("system.methodHelp", method_name, version=2)
         assert d == expected
 
@@ -206,7 +205,7 @@ class TestJSONRPCIntrospection:
                      ['double', 'double', 'double']]),
             ("pair", [['array', 'string', 'int']])
     ))
-    async def testMethodSignature(self, proxy, method_name, expected):
+    async def test_method_signature(self, proxy, method_name, expected):
         response = await proxy.callRemote("system.methodSignature", method_name, version=2)
         assert response == expected
 

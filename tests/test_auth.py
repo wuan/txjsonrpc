@@ -14,7 +14,7 @@ class TestHTTPAuthRealm:
     def test_creation(self):
         assert self.realm.resource == "a resource"
 
-    def test_requestAvatarWeb(self):
+    def test_request_avatar_web(self):
         from twisted.web.resource import IResource
         interface, resource, logoutMethod = self.realm.requestAvatar(
             "an id", None, IResource)
@@ -22,7 +22,7 @@ class TestHTTPAuthRealm:
         assert resource == self.realm.resource
         assert logoutMethod == self.realm.logout
 
-    def test_requestAvatarNonWeb(self):
+    def test_request_avatar_non_web(self):
         with pytest.raises(NotImplementedError):
             self.realm.requestAvatar("an id", None, [Interface])
 
@@ -33,7 +33,7 @@ class TestWrapResource:
         self.checker = InMemoryUsernamePasswordDatabaseDontUse()
         self.checker.addUser("joe", "blow")
 
-    def test_wrapResourceWeb(self):
+    def test_wrap_resource_web(self):
         from twisted.web.resource import IResource, Resource
         root = Resource()
         wrapped = wrapResource(root, [self.checker])
