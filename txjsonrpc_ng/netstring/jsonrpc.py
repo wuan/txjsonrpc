@@ -46,26 +46,39 @@ class JSONRPC(basic.NetstringReceiver, BaseSubhandler):
 
     def stringReceived(self, line):
         parser, unmarshaller = jsonrpclib.getparser()
-        deferred = defer.maybeDeferred(parser.feed, line.decode())
+        req_id = None
+        try:
+            parser.feed(line.decode())
+            parser.close()
+            req_id = unmarshaller.getid()
+            args = unmarshaller.close()
+            functionPath = unmarshaller.getmethodname()
+            function = self._getFunction(functionPath)
+        except jsonrpclib.Fault as fault:
+            # e.g. NoSuchFunction -- report it as a JSON-RPC fault instead of
+            # letting the exception escape the protocol handler.
+            request = defer.succeed(fault)
+        except Exception as error:
+            log.err(error)
+            request = defer.succeed(
+                jsonrpclib.Fault(jsonrpclib.INVALID_JSONRPC, "Invalid Request"))
+        else:
+            if isinstance(args, dict):
+                # JSON-RPC named parameters.
+                request = defer.maybeDeferred(function, **args)
+            else:
+                request = defer.maybeDeferred(function, *(args or ()))
 
-        req, req_id = self._cbDispatch(parser, unmarshaller)
-        deferred.addCallback(lambda x: req)
-        deferred.addErrback(self._ebRender, req_id = req_id)
-        deferred.addCallback(self._cbRender, req_id = req_id)
-        return deferred
-
-    def _cbDispatch(self, parser, unmarshaller):
-        parser.close()
-        args, functionPath, req_id  = unmarshaller.close(), unmarshaller.getmethodname(), unmarshaller.getid()
-        function = self._getFunction(functionPath)
-        return defer.maybeDeferred(function, *args), req_id
+        request.addErrback(self._ebRender, req_id=req_id)
+        request.addCallback(self._cbRender, req_id=req_id)
+        return request
 
     def _cbRender(self, result, req_id):
         if self.version == jsonrpclib.VERSION_PRE1 and not isinstance(result, jsonrpclib.Fault):
             result = (result,)
         try:
             s = jsonrpclib.dumps(result, id=req_id, version=self.version)
-        except:
+        except Exception:
             f = jsonrpclib.Fault(self.FAILURE, "can't serialize output")
             s = jsonrpclib.dumps(f, id=req_id, version=self.version)
         return self.sendString(s.encode())
@@ -136,7 +149,10 @@ class Proxy(BaseProxy):
     def callRemote(self, method, *args, **kwargs):
         version = self._getVersion(kwargs)
         factoryClass = self._getFactoryClass(kwargs)
-        factory = factoryClass(method, version, *args)
+        # Any remaining keyword arguments are JSON-RPC named parameters.
+        params = {key: value for key, value in kwargs.items()
+                  if key not in ("version", "factoryClass")}
+        factory = factoryClass(method, version, *args, **params)
         reactor.connectTCP(self.host, self.port, factory)
         return factory.deferred
 
@@ -160,8 +176,8 @@ class RPCFactory(protocol.ServerFactory):
                 p.putSubHandler(key, klass(*args, **kws))
         return p
 
-    def putSubHandler(self, name, klass, args=(), kws={}):
-        self.subHandlers[name] = (klass, args, kws)
+    def putSubHandler(self, name, klass, args=(), kws=None):
+        self.subHandlers[name] = (klass, args, dict(kws or {}))
 
     def addIntrospection(self):
         self.putSubHandler('system', Introspection, ('protocol',))

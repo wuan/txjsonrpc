@@ -3,7 +3,7 @@
 ## Requirements
 
 - Python 3.10+
-- Twisted 24.11+
+- Twisted 25.5+
 
 ## From PyPI
 

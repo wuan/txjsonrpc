@@ -12,10 +12,8 @@ Maintainer: U{Duncan McGreggor<mailto:oubiwann@adytum.us>}
 """
 
 import codecs
+import gzip
 import io
-
-from twisted.web.client import Agent
-from twisted.web.http_headers import Headers
 
 from .render import renderer_factory
 
@@ -28,12 +26,10 @@ try:
     import xmlrpclib
 except ImportError:
     import xmlrpc.client as xmlrpclib
-import gzip
 
 from twisted.web import resource, server
 from twisted.internet import defer, reactor
 from twisted.python import log, context
-from twisted.web import http
 from twisted.web.client import Agent, HTTPConnectionPool, readBody
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IBodyProducer
@@ -135,56 +131,94 @@ class JSONRPC(resource.Resource, BaseSubhandler):
         content = request.content.read().decode()
         if not content and request.method == 'GET' and 'request' in request.args:
             content = request.args['request'][0]
-        self.callback = request.args['callback'][0] if 'callback' in request.args else None
-        self.is_jsonp = True if self.callback else False
-        if not self.is_jsonp:
-            request.setHeader("content-type", "application/json")
-        else:
+        # JSONP state is per-request; never store it on the shared resource.
+        callback = request.args['callback'][0] if 'callback' in request.args else None
+        request.jsonp_callback = callback
+        if callback:
             request.setHeader("content-type", "text/javascript")
-        parsed = jsonrpclib.loads(content)
-        functionPath = parsed.get("method")
-        params = parsed.get('params', {})
-        args, kwargs = [], {}
-        if params.__class__ == list:
-            args = params
         else:
-            kwargs = params
-        id = parsed.get('id')
-        token = None
-        if request.requestHeaders.hasHeader(self.auth_token):
-            token = request.requestHeaders.getRawHeaders(self.auth_token)[0]
-        version = parsed.get('jsonrpc')
-        if version:
-            version = int(float(version))
-        elif id and not version:
-            version = jsonrpclib.VERSION_1
-        else:
-            version = jsonrpclib.VERSION_PRE1
-        # XXX this all needs to be re-worked to support logic for multiple
-        # versions...
+            request.setHeader("content-type", "application/json")
+
+        id = None
+        version = jsonrpclib.VERSION_PRE1
         try:
+            parsed = jsonrpclib.loads(content)
+            if not isinstance(parsed, dict):
+                raise jsonrpclib.Fault(
+                    jsonrpclib.INVALID_JSONRPC,
+                    "Invalid Request: expected a JSON object")
+            functionPath = parsed.get("method")
+            if not isinstance(functionPath, str):
+                raise jsonrpclib.Fault(
+                    jsonrpclib.INVALID_JSONRPC,
+                    "Invalid Request: missing method")
+            params = parsed.get('params')
+            if params is None:
+                params = {}
+            args, kwargs = [], {}
+            if isinstance(params, list):
+                args = params
+            elif isinstance(params, dict):
+                kwargs = params
+            else:
+                raise jsonrpclib.Fault(
+                    jsonrpclib.INVALID_METHOD_PARAMS,
+                    "Invalid params: expected an array or object")
+            id = parsed.get('id')
+            token = None
+            if request.requestHeaders.hasHeader(self.auth_token):
+                token = request.requestHeaders.getRawHeaders(self.auth_token)[0]
+            version_field = parsed.get('jsonrpc')
+            if version_field:
+                version = int(float(version_field))
+            elif id is not None and not version_field:
+                version = jsonrpclib.VERSION_1
+            else:
+                version = jsonrpclib.VERSION_PRE1
+            # XXX this all needs to be re-worked to support logic for multiple
+            # versions...
             function = self._getFunction(functionPath)
             d = None
             if hasattr(function, 'requires_auth'):
                 d = defer.maybeDeferred(self.auth, token, functionPath)
         except jsonrpclib.Fault as f:
             self._cbRender(f, request, id, version)
+        except (ValueError, TypeError) as error:
+            self._cbRender(
+                jsonrpclib.Fault(jsonrpclib.INVALID_JSONRPC, str(error)),
+                request, id, version)
         else:
             if hasattr(function, 'with_request'):
                 args = [request] + args
 
-            if d:
-                d.addCallback(context.call, function, *args, **kwargs)
+            if d is not None:
+                d.addCallback(self._call_authenticated, function, args, kwargs)
             else:
                 d = defer.maybeDeferred(function, *args, **kwargs)
-            d.addErrback(self._ebRender, id)
-            d.addCallback(self._cbRender, request, id, version)
 
             def _responseFailed(err, call):
                 call.cancel()
 
+            # Register the failure observer *before* wiring up callbacks: a
+            # synchronous method can already have fired *d*, and finishing the
+            # request discards the observer list.
             request.notifyFinish().addErrback(_responseFailed, d)
+            d.addErrback(self._ebRender, id)
+            d.addCallback(self._cbRender, request, id, version)
         return server.NOT_DONE_YET
+
+    def _call_authenticated(self, auth_result, function, args, kwargs):
+        """
+        Enforce the result of L{auth} before invoking the protected method.
+
+        A falsy result (e.g. C{False} or C{None}) denies the request. A truthy
+        non-dict result runs the method without extra context; a dict result is
+        used as the Twisted context for the call.
+        """
+        if not auth_result:
+            raise Unauthorized("Unauthorized")
+        new_context = auth_result if isinstance(auth_result, dict) else {}
+        return context.call(new_context, function, *args, **kwargs)
 
     def _cbRender(self, result, request, id, version):
         if isinstance(result, Handler):
@@ -192,23 +226,28 @@ class JSONRPC(resource.Resource, BaseSubhandler):
 
         if result is not None:
             renderer = renderer_factory(result, id, version, request)
-            renderer.render(self._render_text)
+
+            def string_renderer(result, id, version):
+                return self._render_text(result, id, version, request)
+
+            renderer.render(string_renderer)
 
         request.finish()
         return result
 
-    def _render_text(self, result, id, version) -> str:
+    def _render_text(self, result, id, version, request) -> str:
+        callback = getattr(request, 'jsonp_callback', None)
         if version == jsonrpclib.VERSION_PRE1:
             if not isinstance(result, jsonrpclib.Fault):
                 result = (result,)
         try:
-            s = jsonrpclib.dumps(result, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
-                self.callback, jsonrpclib.dumps(result, id=id, version=version))
-        except:
+            s = jsonrpclib.dumps(result, id=id, version=version)
+        except Exception:
             f = jsonrpclib.Fault(self.FAILURE, "can't serialize output")
-            s = jsonrpclib.dumps(f, id=id, version=version) if not self.is_jsonp else "%s(%s)" % (
-                self.callback, jsonrpclib.dumps(f, id=id, version=version))
-        return s
+            s = jsonrpclib.dumps(f, id=id, version=version)
+        if callback:
+            s = "%s(%s)" % (callback, s)
+        return str(s)
 
     def _map_exception(self, exception):
         return self.except_map.get(exception, self.FAILURE)
@@ -251,8 +290,8 @@ class QueryFactory(BaseQueryFactory):
     """
     deferred = None
 
-    def __init__(self, agent, url, method, username, password, version=jsonrpclib.VERSION_PRE1, compress=False, *args):
-        BaseQueryFactory.__init__(self, method, version, *args)
+    def __init__(self, agent, url, method, username, password, version=jsonrpclib.VERSION_PRE1, compress=False, *args, **kwargs):
+        BaseQueryFactory.__init__(self, method, version, *args, **kwargs)
         self.agent = agent
         self.url = url
         self.username = username
@@ -382,35 +421,31 @@ class Proxy(BaseProxy):
         """
         BaseProxy.__init__(self, version, factoryClass)
 
-        # Parse URL
-        scheme, netloc, path, params, query, fragment = urlparse.urlparse(url)
-        netlocParts = netloc.split('@')
-        if len(netlocParts) == 2:
-            userpass = netlocParts.pop(0).split(':')
-            self.username = userpass.pop(0)
-            try:
-                self.password = userpass.pop(0)
-            except:
-                self.password = None
-        else:
-            self.username = self.password = None
+        # Parse URL.  ``urlsplit`` (via ``parsed.hostname``/``parsed.port``)
+        # correctly handles IPv6 literals and percent/credential parsing.
+        parsed = urlparse.urlsplit(url)
+        scheme = parsed.scheme
+        path = parsed.path
+        host = parsed.hostname
+        try:
+            port = parsed.port
+        except ValueError:
+            port = None
+        self.username = parsed.username
+        self.password = parsed.password
         if username:
             self.username = username
         if password:
             self.password = password
-        hostport = netlocParts[0].split(':')
-        host = hostport.pop(0)
-        try:
-            port = int(hostport.pop(0))
-        except:
-            port = None
         self.secure = (scheme == 'https')
         self.compress = compress
         self.ssl_ctx_factory = ssl_ctx_factory
+        # IPv6 hosts must be bracketed when rebuilding the URL.
+        host_for_url = '[%s]' % host if host and ':' in host else host
         if port:
-            clean_url = '%s://%s:%d%s' % (scheme, host, port, path)
+            clean_url = '%s://%s:%d%s' % (scheme, host_for_url, port, path)
         else:
-            clean_url = '%s://%s%s' % (scheme, host, path)
+            clean_url = '%s://%s%s' % (scheme, host_for_url, path)
         self.url = clean_url
 
         # Create Agent
@@ -428,9 +463,13 @@ class Proxy(BaseProxy):
 
     def callRemote(self, method, *args, **kwargs):
         version = self._getVersion(kwargs)
-        # XXX generate unique id and pass it as a parameter
         factoryClass = self._getFactoryClass(kwargs)
-        factory = factoryClass(self.agent, self.url, method, self.username, self.password, version, self.compress, *args)
+        # Any remaining keyword arguments are JSON-RPC named parameters.
+        params = {key: value for key, value in kwargs.items()
+                  if key not in ("version", "factoryClass")}
+        factory = factoryClass(self.agent, self.url, method, self.username,
+                               self.password, version, self.compress, *args,
+                               **params)
         factory._makeRequest()
         return factory.deferred
 

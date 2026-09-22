@@ -5,6 +5,7 @@ import time
 from collections.abc import Callable
 from typing import Any, Optional
 
+from twisted.python import log
 from twisted.web.http import Request
 
 from .data import CacheableResult
@@ -23,9 +24,11 @@ class Renderer(metaclass=abc.ABCMeta):
 
     def handle_compression(self, response_string: str, cached_response: Optional[bytes],
                            cache_updater: Optional[Callable[[bytes], None]]) -> None:
-        compression = self.request.getHeader('Accept-encoding')
+        accept_encoding = self.request.getHeader('Accept-encoding') or ''
+        encodings = [encoding.strip().lower()
+                     for encoding in accept_encoding.split(',')]
         original_size = len(response_string)
-        if compression == "gzip" and original_size >= 1000:
+        if "gzip" in encodings and original_size >= 1000:
             if cached_response is not None:
                 response_binary = cached_response
             else:
@@ -38,11 +41,12 @@ class Renderer(metaclass=abc.ABCMeta):
                 compressed_size = len(response_binary)
                 elapsed_time = time.time() - start_time
                 break_even = (original_size - compressed_size) / elapsed_time / 1024 / 1024
-                print("renderer: compress data {} -> {} ({:.1f} %) in {:.2f} ms (break even at {:.1f} MB/s)".format(original_size,
-                                                                                                          compressed_size,
-                                                                                                          compressed_size * 100 / original_size,
-                                                                                                          elapsed_time * 1000,
-                                                                                                          break_even))
+                log.msg(
+                    "renderer: compress data {} -> {} ({:.1f} %) in {:.2f} ms "
+                    "(break even at {:.1f} MB/s)".format(
+                        original_size, compressed_size,
+                        compressed_size * 100 / original_size,
+                        elapsed_time * 1000, break_even))
                 if cache_updater is not None:
                     cache_updater(response_binary)
 
@@ -50,7 +54,7 @@ class Renderer(metaclass=abc.ABCMeta):
         else:
             response_binary = response_string.encode()
 
-        self.request.setHeader(b"content-length", str(len(response_binary)))
+        self.request.setHeader("content-length", str(len(response_binary)))
         self.request.write(response_binary)
 
 

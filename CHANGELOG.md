@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Security**: `auth` results are now enforced by `requires_auth`; a falsy
+  return value denies the request instead of executing the method anyway.
+- **Security**: JSONP callback state is now stored per request, preventing a
+  concurrent request from injecting its callback into another response.
+- Invalid or malformed JSON-RPC requests no longer raise unhandled exceptions
+  (HTTP 500); they return a proper JSON-RPC fault.
+- Anonymous (`params: null`) and named parameters are handled correctly.
+- A JSON-RPC 1.0 `id` of `0` is no longer mistaken for a pre-1.0 request.
+- Pre-1.0 responses with falsy results (`0`, `false`, `""`, `[]`, `{}`) no
+  longer collapse to `null`.
+- JSON-RPC 2.0 responses containing `"error": null` parse successfully.
+- Unknown methods over the netstring transport return a fault instead of
+  raising out of the protocol handler.
+- Query factories now generate unique request ids.
+- `wrapResource` no longer mutates its arguments or shares default state.
+
+## [0.8.1] - 2024-10-31
+
+### Changed
+- Version bump to 0.8.1.
+
 ## [0.8.0] - 2024-10-31
 
 ### Added

@@ -15,7 +15,7 @@ class Example(jsonrpc.JSONRPC):
         return a + b
 
 
-factory = jsonrpc.RPCFactory(Example())
+factory = jsonrpc.RPCFactory(Example)
 application = service.Application("Example JSON-RPC Server")
 jsonrpcServer = internet.TCPServer(7080, factory)
 jsonrpcServer.setServiceParent(application)

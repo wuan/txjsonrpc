@@ -4,7 +4,7 @@
 
 - **Twisted** - Asynchronous networking framework
   - Website: https://twistedmatrix.com/
-  - Minimum version: 24.11
+  - Minimum version: 25.5
 
 ## Development
 

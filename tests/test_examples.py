@@ -1,7 +1,6 @@
 import os
 import signal
 import sys
-import tempfile
 from pathlib import Path
 from subprocess import Popen, PIPE
 from time import sleep

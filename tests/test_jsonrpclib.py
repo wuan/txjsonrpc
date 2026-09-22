@@ -1,12 +1,10 @@
 import pytest
 from datetime import datetime
-from twisted.trial.unittest import TestCase
-from twisted.internet import defer
 from txjsonrpc_ng import jsonrpclib
 from txjsonrpc_ng.jsonrpclib import (
     Fault, VERSION_PRE1, VERSION_1, VERSION_2, dumps, loads,
-    JSONRPCEncoder, getparser, Transport, _preV1Request, _v1Request,
-    _v1Notification, _v2Request, _v2Notification, SimpleUnmarshaller,
+    JSONRPCEncoder, getparser, Transport,
+    _v1Notification, _v2Notification,
     ServerProxy)
 
 
@@ -209,3 +207,26 @@ class TestServerProxy:
         assert loaded["params"] == [1, 2]
         assert loaded["id"] == 1
         assert loaded["jsonrpc"] == "2.0"
+
+
+class TestFalsyResults:
+    """Pre-1.0 responses with falsy results must not collapse to null."""
+
+    @pytest.mark.parametrize("value,expected", (
+            (0, "0"),
+            (False, "false"),
+            ("", '""'),
+            ([], "[]"),
+            ({}, "{}"),
+    ))
+    def test_pre1_falsy_result(self, value, expected):
+        assert dumps(value, version=VERSION_PRE1) == expected
+
+
+class TestV2SuccessWithNullError:
+    """A JSON-RPC 2.0 success may legally include ``"error": null``."""
+
+    def test_loads_v2_null_error(self):
+        contents = ('{"jsonrpc": "2.0", "result": 1, "error": null, '
+                    '"id": 1}')
+        assert loads(contents)["result"] == 1

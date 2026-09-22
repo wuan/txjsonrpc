@@ -66,7 +66,7 @@ Or using Poetry:
 Requirements:
 
 * Python 3.10 or higher
-* Twisted 24.11 or higher
+* Twisted 25.5 or higher
 
 -----------
 Quick Start
@@ -132,8 +132,8 @@ More examples are available in the ``examples/`` directory:
 Documentation
 -------------
 
-* **Installation**: See ``docs/INSTALL.txt``
-* **Usage Guide**: See ``docs/USAGE.txt``
+* **Installation**: See ``docs/INSTALL.md``
+* **Usage Guide**: See ``docs/USAGE.md``
 * **Specifications**: See ``docs/specs/`` for JSON-RPC protocol versions
 * **Contributing**: See ``CONTRIBUTING.md``
 * **Security**: See ``SECURITY.md``
@@ -142,7 +142,7 @@ Documentation
 License
 -------
 
-txjsonrpc-ng is licensed under BSD and GPL. See ``LICENSE`` for details.
+txjsonrpc-ng is licensed under the MIT License. See ``LICENSE`` for details.
 
 ------------
 Contributing
