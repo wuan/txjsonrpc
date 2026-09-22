@@ -508,6 +508,50 @@ class TestInvalidRequests:
         assert parsed["result"] == {"a": ["b", "c", 12, []], "D": "foo"}
 
 
+class TestLegacyZeroIdCompatibility:
+    """
+    Non-conforming pre-1.0 clients may use a fixed ``id`` of ``0`` yet expect
+    the bare-array pre-1.0 envelope.  Because such a request is
+    indistinguishable from JSON-RPC 1.0, the legacy behaviour must be opted
+    into explicitly via ``treat_zero_id_as_pre1``.
+    """
+
+    class LegacyResource(jsonrpc.JSONRPC):
+        treat_zero_id_as_pre1 = True
+
+        def jsonrpc_complex(self):
+            return {"a": ["b", "c", 12, []], "D": "foo"}
+
+    def test_zero_id_selects_pre1_envelope_when_enabled(self):
+        body = json.dumps({"method": "complex", "params": [], "id": 0}).encode()
+        _, written = _render(self.LegacyResource(), body)
+        parsed = json.loads(written)
+        # The pre-1.0 envelope is a bare, single-element array.
+        assert isinstance(parsed, list)
+        assert parsed == [{"a": ["b", "c", 12, []], "D": "foo"}]
+
+    def test_non_zero_id_still_selects_version_1_when_enabled(self):
+        body = json.dumps({"method": "complex", "params": [], "id": 1}).encode()
+        _, written = _render(self.LegacyResource(), body)
+        parsed = json.loads(written)
+        assert parsed["id"] == 1
+        assert parsed["result"] == {"a": ["b", "c", 12, []], "D": "foo"}
+
+    def test_missing_id_still_selects_pre1_when_enabled(self):
+        body = json.dumps({"method": "complex", "params": []}).encode()
+        _, written = _render(self.LegacyResource(), body)
+        assert json.loads(written) == [{"a": ["b", "c", 12, []], "D": "foo"}]
+
+    def test_explicit_version_2_wins_over_legacy_flag(self):
+        body = json.dumps({
+            "jsonrpc": "2.0", "method": "complex", "params": [], "id": 0,
+        }).encode()
+        _, written = _render(self.LegacyResource(), body)
+        parsed = json.loads(written)
+        assert parsed["jsonrpc"] == "2.0"
+        assert parsed["result"] == {"a": ["b", "c", 12, []], "D": "foo"}
+
+
 class AuthEnforcedJSONRPC(jsonrpc.JSONRPC):
     executed = False
 

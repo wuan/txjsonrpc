@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- ``JSONRPC.treat_zero_id_as_pre1``: opt-in support for non-conforming legacy
+  pre-1.0 clients that send a fixed ``id`` of ``0`` but expect the bare-array
+  pre-1.0 response envelope.  The spec-correct JSON-RPC 1.0 interpretation
+  remains the default.
+
 ### Fixed
 - **Security**: `auth` results are now enforced by `requires_auth`; a falsy
   return value denies the request instead of executing the method anyway.

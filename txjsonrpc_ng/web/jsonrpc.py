@@ -121,9 +121,37 @@ class JSONRPC(resource.Resource, BaseSubhandler):
     except_map: dict = {}
     auth_token = "Auth-Token"
 
+    #: Requests without a ``jsonrpc`` version field are ambiguous: a JSON-RPC
+    #: 1.0 request carries an ``id`` while a pre-1.0 request does not.  Some
+    #: non-conforming pre-1.0 clients nevertheless send a fixed ``id`` of
+    #: ``0`` and expect the bare-array pre-1.0 envelope.  When this flag is
+    #: enabled such requests are answered with the pre-1.0 envelope; by
+    #: default an ``id`` of ``0`` is treated as JSON-RPC 1.0, which is the
+    #: spec-correct behaviour.
+    treat_zero_id_as_pre1 = False
+
     def __init__(self):
         resource.Resource.__init__(self)
         BaseSubhandler.__init__(self)
+
+    @classmethod
+    def _select_version(cls, parsed, id):
+        """
+        Return the JSON-RPC version to use for the response to ``parsed``.
+
+        An explicit ``jsonrpc`` field always wins.  Otherwise the presence of
+        an ``id`` selects JSON-RPC 1.0, except when :attr:`treat_zero_id_as_pre1`
+        is enabled and the ``id`` is falsy (``0``/``""``/``False``); those
+        requests are treated as legacy pre-1.0 requests.
+        """
+        version_field = parsed.get('jsonrpc')
+        if version_field:
+            return int(float(version_field))
+        if id is None:
+            return jsonrpclib.VERSION_PRE1
+        if cls.treat_zero_id_as_pre1 and not id:
+            return jsonrpclib.VERSION_PRE1
+        return jsonrpclib.VERSION_1
 
     def render(self, request):
         request.content.seek(0, 0)
@@ -168,13 +196,7 @@ class JSONRPC(resource.Resource, BaseSubhandler):
             token = None
             if request.requestHeaders.hasHeader(self.auth_token):
                 token = request.requestHeaders.getRawHeaders(self.auth_token)[0]
-            version_field = parsed.get('jsonrpc')
-            if version_field:
-                version = int(float(version_field))
-            elif id is not None and not version_field:
-                version = jsonrpclib.VERSION_1
-            else:
-                version = jsonrpclib.VERSION_PRE1
+            version = self._select_version(parsed, id)
             # XXX this all needs to be re-worked to support logic for multiple
             # versions...
             function = self._getFunction(functionPath)
